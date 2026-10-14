@@ -5,27 +5,34 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 data class HomeSummary(
     val title: String,
     val value: String
 )
 
-private val sampleSummaries = listOf(
-    HomeSummary("Empleados", "12"),
-    HomeSummary("Subcontratados", "4"),
-    HomeSummary("Servicios activos", "6"),
-    HomeSummary("Alertas", "3")
-)
-
 @Composable
 fun HomeScreen(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    homeViewModel: HomeViewModel = viewModel()
 ) {
+    val uiState by homeViewModel.uiState.collectAsStateWithLifecycle()
+
+    val summaries = listOf(
+        HomeSummary("Empleados", uiState.empleados.toString()),
+        HomeSummary("Subcontratados", uiState.subcontratados.toString()),
+        HomeSummary("Servicios activos", uiState.serviciosActivos.toString()),
+        HomeSummary("Alertas", uiState.alertas.toString())
+    )
+
     Column(
-        modifier = modifier.fillMaxSize()
+        modifier = modifier
+            .fillMaxSize()
             .padding(16.dp)
     ) {
         Text(
@@ -42,11 +49,20 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(sampleSummaries) { summary ->
-                SummaryCard(summary)
+        if (uiState.isLoading) {
+            CircularProgressIndicator()
+        } else if (uiState.error != null) {
+            Text(
+                text = uiState.error ?: "Error desconocido",
+                color = MaterialTheme.colorScheme.error
+            )
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(summaries) { summary ->
+                    SummaryCard(summary)
+                }
             }
         }
     }
@@ -74,3 +90,4 @@ private fun SummaryCard(summary: HomeSummary) {
         }
     }
 }
+
