@@ -2,6 +2,8 @@
 package com.example.gestorempresa
 
 import android.os.Bundle
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Color
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -12,13 +14,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.gestorempresa.ui.auth.AuthViewModel
-import com.example.gestorempresa.ui.home.HomeScreen
+import com.example.gestorempresa.ui.home.HomeListsContent
 import com.example.gestorempresa.ui.navigation.AuthRoot
 import com.example.gestorempresa.ui.theme.GestorEmpresaTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -36,9 +39,9 @@ class MainActivity : ComponentActivity() {
             GestorEmpresaTheme {
                 AuthRoot(
                     viewModel = authViewModel,
-                    contenidoAutenticado = { _, onLogout ->
+                    contenidoAutenticado = { session, onLogout ->
                         Column(
-                            modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxSize().background(Color(0xFF020617)).safeDrawingPadding()
                         ) {
                             Row(
                                 modifier = Modifier
@@ -47,11 +50,12 @@ class MainActivity : ComponentActivity() {
                                 horizontalArrangement = Arrangement.End
                             ) {
                                 TextButton(onClick = onLogout) {
-                                    Text("Cerrar sesión")
+                                    Text("Cerrar sesión", color = Color(0xFF60A5FA))
                                 }
                             }
 
-                            HomeScreen(
+                            HomeListsContent(
+                                session = session,
                                 modifier = Modifier.weight(1f)
                             )
                         }

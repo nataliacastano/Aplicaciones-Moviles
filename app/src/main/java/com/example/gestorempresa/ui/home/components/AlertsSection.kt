@@ -26,7 +26,7 @@ fun AlertsSection(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = "AVISOS Y ALERTAS DE OBRA",
+                text = "AVISOS Y VENCIMIENTOS",
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFFCBD5E1)
@@ -61,11 +61,11 @@ private fun AlertCard(
     alerta: HomeAlert,
     onClick: () -> Unit
 ) {
-    val colorAlerta = when (alerta.tipo) {
+    val colorAlerta = if (alerta.urgente) Color(0xFFFB7185) else when (alerta.tipo) {
         AlertType.STOCK_BAJO -> Color(0xFFFB7185)
         AlertType.PAGO_PENDIENTE -> Color(0xFFFBBF24)
         AlertType.DOCUMENTACION -> Color(0xFF60A5FA)
-        AlertType.GENERAL -> Color(0xFF94A3B8)
+        AlertType.GENERAL -> Color(0xFFFBBF24)
     }
 
     val textoBoton = when (alerta.tipo) {
