@@ -10,14 +10,16 @@ plugins {
 
 // Permite compilar antes de descargar la configuración real del proyecto del equipo.
 val authEmulatorHost = providers.gradleProperty("firebaseAuthEmulatorHost").orElse("").get()
-if (file("google-services.json").isFile && authEmulatorHost.isBlank()) apply(plugin = "com.google.gms.google-services")
+// Las pruebas de UI usan otra aplicación para que su desinstalación no borre datos de desarrollo.
+val homeUiTests = providers.gradleProperty("homeUiTests").orElse("false").get().toBoolean()
+if (file("google-services.json").isFile && authEmulatorHost.isBlank() && !homeUiTests) apply(plugin = "com.google.gms.google-services")
 
 android {
     namespace = "com.example.gestorempresa"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.gestorempresa"
+        applicationId = if (homeUiTests) "com.example.gestorempresa.uitests" else "com.example.gestorempresa"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
@@ -59,6 +61,16 @@ android {
 }
 
 ksp { arg("room.schemaLocation", "$projectDir/schemas") }
+
+tasks.configureEach {
+    if (name.startsWith("connected") && name.endsWith("AndroidTest")) {
+        doFirst {
+            check(homeUiTests) {
+                "Ejecuta las pruebas con -PhomeUiTests=true para proteger los datos de la app de desarrollo."
+            }
+        }
+    }
+}
 
 dependencies {
     implementation(platform(libs.firebase.bom))
