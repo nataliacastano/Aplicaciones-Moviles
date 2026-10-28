@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -23,19 +24,24 @@ import com.example.gestorempresa.ui.home.components.QuickActions
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
-    homeViewModel: HomeViewModel = viewModel(),
+    homeViewModel: HomeViewModel? = null,
     onObrasClick: () -> Unit = {},
     onEmpleadosClick: () -> Unit = {},
     onNuevaObra: () -> Unit = {},
     onAltaEmpleado: () -> Unit = {},
     onMovimiento: () -> Unit = {},
     onParteDiario: () -> Unit = {},
-    onAlertClick: (HomeAlert) -> Unit = {}
+    onAlertClick: (HomeAlert) -> Unit = {},
+    stateOverride: HomeUiState? = null,
+    onSectionClick: (String) -> Unit = {},
+    onRetry: () -> Unit = {}
 ) {
-    val uiState by homeViewModel.uiState.collectAsStateWithLifecycle()
+    val observedState = homeViewModel?.state?.collectAsStateWithLifecycle()?.value
+    val uiState = stateOverride ?: observedState?.summary("", "") ?: HomeUiState()
 
     LazyColumn(
         modifier = modifier
+            .testTag("home-list")
             .fillMaxSize()
             .background(Color(0xFF020617)),
         contentPadding = PaddingValues(16.dp),
@@ -60,6 +66,7 @@ fun HomeScreen(
                     text = uiState.error ?: "Error desconocido",
                     color = MaterialTheme.colorScheme.error
                 )
+                Button(onClick = onRetry) { Text("Reintentar") }
             }
         } else {
 
@@ -76,18 +83,18 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     KpiCard(
-                        titulo = "Obras activas",
+                        titulo = "Trabajos activos",
                         valor = "${uiState.obrasActivas} / ${uiState.totalObras}",
-                        descripcion = "En ejecución normal",
+                        descripcion = "En ejecución",
                         colorDescripcion = Color(0xFF34D399),
                         modifier = Modifier.weight(1f),
                         onClick = onObrasClick
                     )
 
                     KpiCard(
-                        titulo = "En campo hoy",
+                        titulo = "Personal hoy",
                         valor = "${uiState.trabajadoresEnCampo} op.",
-                        descripcion = "Personal en obra",
+                        descripcion = "Con parte registrado",
                         modifier = Modifier.weight(1f),
                         onClick = onEmpleadosClick
                     )
@@ -109,6 +116,8 @@ fun HomeScreen(
                     onParteDiario = onParteDiario
                 )
             }
+
+            item { HomeSummarySections(uiState, onSectionClick) }
 
             item {
                 AlertsSection(

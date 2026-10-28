@@ -6,7 +6,10 @@ data class HomeAlert(
     val id: Int,
     val titulo: String,
     val descripcion: String,
-    val tipo: AlertType
+    val tipo: AlertType,
+    val urgente: Boolean = false,
+    val destino: String? = null,
+    val elementoId: Long? = null
 )
 
 // Estos son los tipos de alertas para distinguir su importancia.
@@ -44,7 +47,13 @@ data class HomeUiState(
 
     // Estado de la interfaz.
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val documentosPendientes: Int = 0,
+    val cursosProximos: Int = 0,
+    val medicosProximos: Int = 0,
+    val tareasPendientes: Int = 0,
+    val trabajosPendientes: Int = 0,
+    val proximasTareas: List<String> = emptyList()
 ) {
     // Calcula la diferencia entre ingresos y gastos.
     val balance: Double
