@@ -14,7 +14,7 @@ import com.example.gestorempresa.ui.theme.GestorEmpresaTheme
 fun ForgotPasswordScreen(state: AuthUiState, onEmailChange: (String) -> Unit,
     onSend: () -> Unit, onBack: () -> Unit
 ) {
-    AuthLayout("Recupera tu contraseña", "Introduce el correo de tu cuenta para solicitar un enlace de recuperación.") {
+    AuthLayout("Recupera tu contraseña", "Introduce el correo de tu cuenta para solicitar un enlace de recuperación. Por seguridad, la app no confirma en pantalla si ese correo está registrado.") {
         AuthTextField(state.emailRecuperacion, onEmailChange, "Correo electrónico",
             state.errores[CampoAuth.EMAIL], !state.ocupado, KeyboardType.Email)
         state.mensaje?.let { AuthMessage(it) }

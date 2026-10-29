@@ -52,7 +52,7 @@ fun HomeWorkspaceState.catalog(kind: CatalogKind): List<CatalogRow> {
             CatalogRow(s.id, s.nombreComercial, "${s.oficio} · ${s.personaContacto}", "${s.email} ${s.telefono} $z",
                 trade = s.oficio, type = "SUBCONTRATADO", status = if (s.activo) "ACTIVO" else "INACTIVO", zone = z, projectIds = assigned("SUBCONTRATADO", s.id))
         }
-        CatalogKind.PROJECTS -> projects.map { p -> CatalogRow(p.id, p.titulo, "${p.clienteNombre} · ${p.direccionUbicacion}",
+        CatalogKind.PROJECTS -> projects.map { p -> CatalogRow(p.id, p.titulo, "${p.clienteNombre.ifBlank { "Sin cliente" }} · ${p.direccionUbicacion}",
             "${p.tipo} ${p.estado} ${p.fechaInicio} ${p.fechaFin.orEmpty()}", type = p.tipo, status = p.estado,
             zone = p.direccionUbicacion, startDate = p.fechaInicio, endDate = p.fechaFin) }
         CatalogKind.SUPPLIERS -> suppliers.map { s -> CatalogRow(s.id, s.nombreEmpresa, s.personaContacto, "${s.cif} ${s.telefono} ${s.email}") }

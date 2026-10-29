@@ -11,6 +11,14 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
+/** Añade el número de afiliación del empleado conservando los registros anteriores. */
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE empleados ADD COLUMN numeroSeguridadSocial TEXT NOT NULL DEFAULT ''")
+        db.execSQL("UPDATE empleados SET tipoEmpleado = 'COMPLETO' WHERE tipoEmpleado = 'FIJO'")
+    }
+}
+
 /** Mantiene intactas las siete tablas de la versión 1 del equipo. */
 val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {

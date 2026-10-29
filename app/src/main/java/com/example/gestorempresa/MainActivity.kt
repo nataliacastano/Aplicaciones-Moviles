@@ -2,8 +2,6 @@
 package com.example.gestorempresa
 
 import android.os.Bundle
-import androidx.compose.foundation.background
-import androidx.compose.ui.graphics.Color
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -41,7 +39,7 @@ class MainActivity : ComponentActivity() {
                     viewModel = authViewModel,
                     contenidoAutenticado = { session, onLogout ->
                         Column(
-                                modifier = Modifier.fillMaxSize().background(Color(0xFF020617)).safeDrawingPadding()
+                                modifier = Modifier.fillMaxSize().safeDrawingPadding()
                         ) {
                             Row(
                                 modifier = Modifier
@@ -50,7 +48,7 @@ class MainActivity : ComponentActivity() {
                                 horizontalArrangement = Arrangement.End
                             ) {
                                 TextButton(onClick = onLogout) {
-                                    Text("Cerrar sesión", color = Color(0xFF60A5FA))
+                                    Text("Cerrar sesión")
                                 }
                             }
 

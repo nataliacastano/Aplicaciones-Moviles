@@ -6,11 +6,12 @@ import androidx.compose.ui.graphics.Color
 
 @Composable
 fun HomeModuleTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = darkColorScheme(
-        primary = Color(0xFF60A5FA), onPrimary = Color(0xFF020617),
-        secondary = Color(0xFF34D399), background = Color(0xFF020617),
-        onBackground = Color.White, surface = Color(0xFF0F172A), onSurface = Color.White,
-        surfaceVariant = Color(0xFF1E293B), onSurfaceVariant = Color(0xFFCBD5E1),
-        outline = Color(0xFF475569), error = Color(0xFFFB7185)
+    MaterialTheme(colorScheme = lightColorScheme(
+        primary = Color(0xFF355F83), onPrimary = Color.White,
+        secondary = Color(0xFF39735F), background = Color(0xFFFFFEFC),
+        onBackground = Color(0xFF242321), surface = Color.White, onSurface = Color(0xFF242321),
+        surfaceVariant = Color(0xFFF2EFE9), onSurfaceVariant = Color(0xFF5F5A53),
+        outline = Color(0xFF81796E), error = Color(0xFFB3261E),
+        primaryContainer = Color(0xFFE2EDF6), secondaryContainer = Color(0xFFE2F0E8)
     ), typography = MaterialTheme.typography, content = content)
 }

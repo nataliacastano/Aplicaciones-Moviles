@@ -30,7 +30,7 @@ fun QuickActions(
         Text(
             text = "ACCIONES RÁPIDAS",
             style = MaterialTheme.typography.labelMedium,
-            color = Color(0xFFCBD5E1)
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         Row(
@@ -40,26 +40,26 @@ fun QuickActions(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             QuickActionButton(
-                texto = "+ Nueva obra",
-                color = Color(0xFFFB923C),
+                texto = "+ Nuevo servicio",
+                color = Color(0xFF9A4C00),
                 onClick = onNuevaObra
             )
 
             QuickActionButton(
                 texto = "+ Alta empleado",
-                color = Color(0xFF60A5FA),
+                color = Color(0xFF285E8E),
                 onClick = onAltaEmpleado
             )
 
             QuickActionButton(
                 texto = "Gasto / Ingreso",
-                color = Color(0xFF34D399),
+                color = Color(0xFF22684A),
                 onClick = onMovimiento
             )
 
             QuickActionButton(
                 texto = "Parte diario",
-                color = Color(0xFFC084FC),
+                color = Color(0xFF67408C),
                 onClick = onParteDiario
             )
         }

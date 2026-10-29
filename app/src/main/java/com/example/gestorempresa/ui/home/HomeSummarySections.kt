@@ -14,7 +14,7 @@ import com.example.gestorempresa.ui.home.components.KpiCard
             KpiCard("Empleados", "${state.empleados}", "Activos", modifier = Modifier.weight(1f), onClick = { onSection("EMPLOYEES") })
             KpiCard("Subcontratados", "${state.subcontratados}", "Activos", modifier = Modifier.weight(1f), onClick = { onSection("SUBCONTRACTORS") })
         }
-        Text("DOCUMENTACIÓN Y PLANIFICACIÓN", color = Color(0xFF94A3B8), style = MaterialTheme.typography.labelMedium)
+        Text("DOCUMENTACIÓN Y PLANIFICACIÓN", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
         val sections = listOf(
             Triple("Documentos pendientes", state.documentosPendientes, "DOCUMENTO"),
             Triple("Reconocimientos próximos o vencidos", state.medicosProximos, "MEDICO"),
@@ -26,8 +26,8 @@ import com.example.gestorempresa.ui.home.components.KpiCard
             OutlinedButton(onClick = { onSection(route) }, modifier = Modifier.fillMaxWidth()) { Text("$label: $count") }
         }
         if (state.proximasTareas.isNotEmpty()) {
-            Text("PRÓXIMAS TAREAS", color = Color(0xFFCBD5E1), style = MaterialTheme.typography.labelMedium)
-            state.proximasTareas.forEach { Text(it, color = Color.White) }
+            Text("PRÓXIMAS TAREAS", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+            state.proximasTareas.forEach { Text(it, color = MaterialTheme.colorScheme.onSurface) }
         }
     }
 }

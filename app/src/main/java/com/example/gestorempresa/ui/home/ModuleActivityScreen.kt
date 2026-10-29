@@ -22,7 +22,7 @@ fun ModuleActivityScreen(route: String, state: HomeWorkspaceState, vm: HomeWorks
     val saving by vm.saving.collectAsStateWithLifecycle()
     val error by vm.saveError.collectAsStateWithLifecycle()
     val today = LocalDate.now().toString()
-    val title = when (route) { "tasks" -> "Tareas y trabajos pendientes"; "assignments" -> "Zonas y asignaciones"; else -> "Documentación y vencimientos" }
+    val title = when (route) { "tasks" -> "Tareas y trabajos pendientes"; "assignments" -> "Zonas laborales y asignaciones"; else -> "Documentación y vencimientos" }
     fun matches(text: String) = query.normalizedSearch().split(Regex("\\s+")).all { it in text.normalizedSearch() }
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { TextButton(onClick = onBack) { Text("Volver") } }
@@ -47,8 +47,15 @@ fun ModuleActivityScreen(route: String, state: HomeWorkspaceState, vm: HomeWorks
                 }
             }
             "assignments" -> {
+                item { Text("Zona laboral: dónde suele trabajar la persona. Asignación: servicio o proyecto concreto al que se incorpora.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                val zones = state.workerMeta.filter { matches("${state.workerName(it.workerKind, it.workerId)} ${it.workZone}") }
+                if (zones.isNotEmpty()) item { Text("ZONAS HABITUALES", style = MaterialTheme.typography.labelLarge) }
+                items(zones, key = { "zone-${it.workerKind}-${it.workerId}" }) { meta ->
+                    ActivityCard(state.workerName(meta.workerKind, meta.workerId), meta.workZone, "Zona habitual", false) { }
+                }
                 val assignments = state.assignments.filter { a -> matches("${state.workerName(a.workerKind, a.workerId)} ${state.projects.firstOrNull { it.id == a.projectId }?.titulo.orEmpty()}") }
-                if (assignments.isEmpty()) item { EmptyCatalog("No hay asignaciones que mostrar. Las zonas también se consultan y filtran en los listados de trabajadores.") }
+                if (assignments.isNotEmpty()) item { Text("PROYECTOS ASIGNADOS", style = MaterialTheme.typography.labelLarge) }
+                if (assignments.isEmpty() && zones.isEmpty()) item { EmptyCatalog("Todavía no hay zonas ni asignaciones. Añade una zona habitual y, si quieres, un proyecto para un empleado.") }
                 items(assignments, key = { "${it.workerKind}-${it.workerId}-${it.projectId}" }) { a ->
                     ActivityCard(state.workerName(a.workerKind, a.workerId), state.projects.firstOrNull { it.id == a.projectId }?.titulo.orEmpty(), a.workerKind, false) {
                         TextButton(enabled = !saving, onClick = { vm.save({ unassign(a.workerKind, a.workerId, a.projectId) }, {}) }) { Text("Quitar asignación") }
