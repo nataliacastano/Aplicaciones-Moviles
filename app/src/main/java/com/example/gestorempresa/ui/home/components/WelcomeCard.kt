@@ -23,7 +23,7 @@ fun WelcomeCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = Color(0xFF0F172A),
+        color = MaterialTheme.colorScheme.surfaceVariant,
         tonalElevation = 2.dp
     ) {
         Column(
@@ -33,19 +33,19 @@ fun WelcomeCard(
             Text(
                 text = cargoAdministrador.uppercase(),
                 style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFFFB923C)
+                color = MaterialTheme.colorScheme.primary
             )
 
             Text(
                 text = nombreAdministrador,
                 style = MaterialTheme.typography.titleLarge,
-                color = Color.White
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Text(
                 text = "Gestión operativa y control de caja en tiempo real.",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFF94A3B8)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

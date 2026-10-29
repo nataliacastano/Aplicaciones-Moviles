@@ -2,11 +2,13 @@ package com.example.gestorempresa.ui.home
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.gestorempresa.data.local.HomeMovement
@@ -26,14 +28,20 @@ internal fun validDate(value: String): Boolean = try {
 } catch (_: Exception) { false }
 
 @Composable
-fun HomeEntryForm(kind: String, vm: HomeWorkspaceViewModel, state: HomeWorkspaceState, onBack: () -> Unit) {
-    key(kind) {
-        var title by rememberSaveable { mutableStateOf("") }
-        var surname by rememberSaveable { mutableStateOf("") }
-        var trade by rememberSaveable { mutableStateOf("") }
-        var type by rememberSaveable { mutableStateOf(if (kind == "project-new") "SERVICIO" else "FIJO") }
-        var phone by rememberSaveable { mutableStateOf("") }
-        var email by rememberSaveable { mutableStateOf("") }
+fun HomeEntryForm(kind: String, vm: HomeWorkspaceViewModel, state: HomeWorkspaceState, onBack: () -> Unit,
+    editingEmployee: EmpleadoEntity? = null) {
+    key(kind, editingEmployee?.id) {
+        var title by rememberSaveable { mutableStateOf(editingEmployee?.nombre.orEmpty()) }
+        var surname by rememberSaveable { mutableStateOf(editingEmployee?.apellidos.orEmpty()) }
+        var trade by rememberSaveable { mutableStateOf(editingEmployee?.oficio.orEmpty()) }
+        var type by rememberSaveable { mutableStateOf(editingEmployee?.tipoEmpleado?.let { if (it == "FIJO") "COMPLETO" else it } ?: if (kind == "project-new") "SERVICIO" else "COMPLETO") }
+        var dni by rememberSaveable { mutableStateOf(editingEmployee?.dni.orEmpty()) }
+        var socialSecurity by rememberSaveable { mutableStateOf(editingEmployee?.numeroSeguridadSocial.orEmpty().filter { it.isDigit() }.take(12)) }
+        var residence by rememberSaveable { mutableStateOf(editingEmployee?.lugarResidencia.orEmpty()) }
+        var address by rememberSaveable { mutableStateOf(editingEmployee?.direccionPersonal.orEmpty()) }
+        var salary by rememberSaveable { mutableStateOf(editingEmployee?.salarioBase?.takeIf { it > 0 }?.toString().orEmpty()) }
+        var phone by rememberSaveable { mutableStateOf(editingEmployee?.telefono.orEmpty().filter { it.isDigit() }.take(15)) }
+        var email by rememberSaveable { mutableStateOf(editingEmployee?.email.orEmpty()) }
         var client by rememberSaveable { mutableStateOf("") }
         var location by rememberSaveable { mutableStateOf("") }
         var date by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
@@ -49,7 +57,8 @@ fun HomeEntryForm(kind: String, vm: HomeWorkspaceViewModel, state: HomeWorkspace
         LaunchedEffect(kind) { vm.saveError.value = null }
         val titleText = when (kind) {
             "employee-new" -> "Alta de empleado"
-            "project-new" -> "Nuevo servicio / proyecto"
+            "employee-edit" -> "Editar empleado"
+            "project-new" -> if (type == "SERVICIO") "Nuevo servicio" else "Nuevo proyecto"
             "movement" -> "Gasto / Ingreso"
             else -> "Parte diario"
         }
@@ -58,26 +67,34 @@ fun HomeEntryForm(kind: String, vm: HomeWorkspaceViewModel, state: HomeWorkspace
             Text(titleText, style = MaterialTheme.typography.headlineMedium)
             if (state.loading) CircularProgressIndicator()
             state.error?.let { Text(it, color = MaterialTheme.colorScheme.error); Button(onClick = vm::retry) { Text("Reintentar") } }
-            if (kind == "employee-new") {
+            if (kind == "employee-new" || kind == "employee-edit") {
                 EntryField("Nombre *", title, { title = it }, !saving)
                 EntryField("Apellidos *", surname, { surname = it }, !saving)
+                EntryField("DNI / NIE *", dni, { dni = it }, !saving)
                 EntryField("Oficio *", trade, { trade = it }, !saving)
-                ChoiceField("Tipo de contrato", type, listOf("FIJO", "PARCIAL"), !saving) { type = it }
-                EntryField("Teléfono (opcional)", phone, { phone = it }, !saving)
-                EntryField("Correo (opcional)", email, { email = it }, !saving)
+                ChoiceField("Jornada", if (type == "FIJO") "COMPLETO" else type, listOf("COMPLETO", "PARCIAL"), !saving) { type = it }
+                Text(if (type == "PARCIAL") "Jornada parcial: horario reducido. Registra las horas realizadas desde Parte diario." else "Jornada completa. Registra las horas realizadas desde Parte diario.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                EntryField("Teléfono *", phone, { phone = it }, !saving)
+                EntryField("Correo electrónico *", email, { email = it }, !saving)
+                EntryField("Salario base mensual (€) *", salary, { salary = it }, !saving)
+                EntryField("Nº de Seguridad Social", socialSecurity, { socialSecurity = it }, !saving)
+                EntryField("Lugar de residencia *", residence, { residence = it }, !saving)
+                EntryField("Dirección personal *", address, { address = it }, !saving)
             } else if (kind == "project-new") {
                 ChoiceField("Tipo", type, listOf("SERVICIO", "PROYECTO"), !saving) { type = it }
-                EntryField("Nombre *", title, { title = it }, !saving)
-                EntryField("Cliente *", client, { client = it }, !saving)
-                EntryField("Ubicación *", location, { location = it }, !saving)
-                EntryField("Inicio (AAAA-MM-DD) *", date, { date = it }, !saving)
-                EntryField("Fin previsto (AAAA-MM-DD, opcional)", endDate, { endDate = it }, !saving)
+                Text(if (type == "SERVICIO") "Registra un local o una actividad que gestionas de forma habitual. La fecha de apertura inicia su historial." else "Registra un trabajo concreto. Puedes indicar el cliente y la fecha de fin si los conoces.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                EntryField(if (type == "SERVICIO") "Nombre del servicio o local *" else "Nombre del proyecto *", title, { title = it }, !saving)
+                if (type == "PROYECTO") EntryField("Cliente (opcional)", client, { client = it }, !saving)
+                EntryField("Ubicación o dirección *", location, { location = it }, !saving)
+                EntryField(if (type == "SERVICIO") "Fecha de apertura (AAAA-MM-DD) *" else "Fecha de inicio (AAAA-MM-DD) *", date, { date = it }, !saving)
+                if (type == "PROYECTO") EntryField("Fecha de fin prevista (opcional)", endDate, { endDate = it }, !saving)
             } else {
                 val available = state.projects.filter { it.estado == "ACTIVO" }
                 SelectionField("Servicio / proyecto", projectId, available.map { it.id to it.titulo }, !saving) { projectId = it }
                 if (available.isEmpty()) Text("Primero crea un servicio o proyecto desde Inicio.", color = MaterialTheme.colorScheme.secondary)
                 EntryField("Fecha (AAAA-MM-DD) *", date, { date = it }, !saving)
                 if (kind == "movement") {
+                    Text("Ingreso: dinero que recibes por un servicio. Gasto: dinero que pagas, por ejemplo a proveedores. El balance resta gastos a ingresos.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     EntryField("Concepto *", title, { title = it }, !saving)
                     EntryField("Importe en euros *", amount, { amount = it }, !saving)
                     ChoiceField("Tipo", if (income) "Ingreso" else "Gasto", listOf("Gasto", "Ingreso"), !saving) { income = it == "Ingreso" }
@@ -93,18 +110,30 @@ fun HomeEntryForm(kind: String, vm: HomeWorkspaceViewModel, state: HomeWorkspace
                 onClick = {
                     error = null
                     when (kind) {
-                        "employee-new" -> {
-                            if (title.isBlank() || surname.isBlank() || trade.isBlank()) error = "Completa nombre, apellidos y oficio."
-                            else if (email.isNotBlank() && !android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()) error = "Revisa el correo electrónico."
-                            else vm.save({ addEmployee(EmpleadoEntity(nombre = title.trim(), apellidos = surname.trim(), dni = "",
-                                telefono = phone.trim(), email = email.trim(), oficio = trade.trim(), tipoEmpleado = type,
-                                salarioBase = 0.0, lugarResidencia = "", direccionPersonal = "")) }, onBack)
+                        "employee-new", "employee-edit" -> {
+                            if (!validPersonName(title) || !validPersonName(surname)) error = "El nombre y los apellidos solo pueden contener letras, espacios, guiones o apóstrofos."
+                            else if (dni.isBlank() || !Regex("(?i)^[0-9XYZ]\\d{7}[A-Z]$").matches(dni.trim().replace(" ", ""))) error = "Introduce un DNI o NIE válido (8 números y una letra)."
+                            else if (trade.isBlank()) error = "Indica el oficio del empleado."
+                            else if (phone.length !in 9..15) error = "El teléfono debe tener entre 9 y 15 dígitos."
+                            else if (email.isBlank() || !android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()) error = "Introduce un correo electrónico válido."
+                            else if (salary.isBlank() || (salary.replace(',', '.').toDoubleOrNull()?.let { !it.isFinite() || it < 0 } != false)) error = "Introduce un salario base válido."
+                            else if (residence.isBlank() || address.isBlank()) error = "Completa el lugar de residencia y la dirección personal."
+                            else if (socialSecurity.isNotBlank() && socialSecurity.length != 12) error = "El número de Seguridad Social debe tener 12 dígitos."
+                            else {
+                                val salaryValue = salary.replace(',', '.').toDouble()
+                                val value = EmpleadoEntity(id = editingEmployee?.id ?: 0, nombre = title.trim(), apellidos = surname.trim(), dni = dni.trim(),
+                                    telefono = phone.trim(), email = email.trim(), oficio = trade.trim(), tipoEmpleado = type, salarioBase = salaryValue,
+                                    lugarResidencia = residence.trim(), direccionPersonal = address.trim(), fotoUrl = editingEmployee?.fotoUrl,
+                                    activo = editingEmployee?.activo ?: true, numeroSeguridadSocial = socialSecurity)
+                                vm.save({ if (editingEmployee == null) addEmployee(value) else updateEmployee(value) }, onBack)
+                            }
                         }
                         "project-new" -> {
-                            if (title.isBlank() || client.isBlank() || location.isBlank()) error = "Completa nombre, cliente y ubicación."
+                            if (title.isBlank() || location.isBlank()) error = "Completa el nombre y la ubicación."
                             else if (!validDate(date) || (endDate.isNotBlank() && (!validDate(endDate) || endDate < date))) error = "Revisa las fechas; el fin no puede ser anterior al inicio."
                             else vm.save({ addProject(UnidadTrabajoEntity(titulo = title.trim(), tipo = type,
-                                clienteNombre = client.trim(), direccionUbicacion = location.trim(), fechaInicio = date, fechaFin = endDate.ifBlank { null })) }, onBack)
+                                clienteNombre = if (type == "PROYECTO") client.trim() else "", direccionUbicacion = location.trim(), fechaInicio = date,
+                                fechaFin = if (type == "PROYECTO") endDate.ifBlank { null } else null)) }, onBack)
                         }
                         else -> {
                             val p = projectId
@@ -144,8 +173,26 @@ fun HomeEntryForm(kind: String, vm: HomeWorkspaceViewModel, state: HomeWorkspace
 
 @Composable
 internal fun EntryField(label: String, value: String, onChange: (String) -> Unit, enabled: Boolean) {
-    OutlinedTextField(value, onChange, label = { Text(label) }, enabled = enabled, singleLine = true, modifier = Modifier.fillMaxWidth())
+    val isPhone = label.contains("teléfono", ignoreCase = true)
+    val isSocialSecurity = label.contains("Seguridad Social", ignoreCase = true)
+    val isPersonName = label == "Nombre *" || label == "Apellidos *"
+    OutlinedTextField(value, { input ->
+        val clean = when {
+            isPhone || isSocialSecurity -> input.filter { it.isDigit() }.take(if (isPhone) 15 else 12)
+            isPersonName -> input.filter { it.isLetter() || it.isWhitespace() || it == '-' || it == '\'' }
+            else -> input
+        }
+        onChange(clean)
+    }, label = { Text(label) }, enabled = enabled, singleLine = true, modifier = Modifier.fillMaxWidth(),
+        keyboardOptions = KeyboardOptions(keyboardType = when {
+            isPhone || isSocialSecurity -> KeyboardType.Number
+            label.contains("correo", ignoreCase = true) -> KeyboardType.Email
+            label.contains("salario", ignoreCase = true) || label.contains("importe", ignoreCase = true) || label.contains("euros", ignoreCase = true) -> KeyboardType.Decimal
+            else -> KeyboardType.Text
+        }))
 }
+
+private fun validPersonName(value: String): Boolean = value.trim().matches(Regex("[\\p{L}][\\p{L} .'-]{0,99}"))
 
 @Composable
 internal fun ChoiceField(label: String, value: String, options: List<String>, enabled: Boolean, onChange: (String) -> Unit) {
@@ -163,10 +210,10 @@ internal fun SelectionField(label: String, selected: Long?, options: List<Pair<L
     var expanded by remember { mutableStateOf(false) }
     Box {
         OutlinedButton(onClick = { expanded = true }, enabled = enabled && options.isNotEmpty(), modifier = Modifier.fillMaxWidth()) {
-            Text("$label: ${options.firstOrNull { it.first == selected }?.let { "${it.second} (#${it.first})" } ?: "Seleccionar"}")
+            Text("$label: ${options.firstOrNull { it.first == selected }?.second ?: "Seleccionar"}")
         }
         DropdownMenu(expanded, { expanded = false }) {
-            options.forEach { (id, name) -> DropdownMenuItem(text = { Text("$name (#$id)") }, onClick = { onChange(id); expanded = false }) }
+            options.forEach { (id, name) -> DropdownMenuItem(text = { Text(name) }, onClick = { onChange(id); expanded = false }) }
         }
     }
 }

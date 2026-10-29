@@ -1,5 +1,6 @@
 package com.example.gestorempresa.data.local.entities
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -16,10 +17,11 @@ data class EmpleadoEntity(
     val telefono: String,
     val email: String,
     val oficio: String,
-    val tipoEmpleado: String,    //"FIJO", "PARCIAL"
+    val tipoEmpleado: String,    // "COMPLETO" o "PARCIAL"
     val salarioBase: Double,
     val lugarResidencia: String,
     val direccionPersonal: String,
     val fotoUrl: String? = null,
-    val activo: Boolean = true   //dar de baja sin borrar los datos históricos
+    val activo: Boolean = true,  //dar de baja sin borrar los datos históricos
+    @ColumnInfo(defaultValue = "''") val numeroSeguridadSocial: String = ""
 )

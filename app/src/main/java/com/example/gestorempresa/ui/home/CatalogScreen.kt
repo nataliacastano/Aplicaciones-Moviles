@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -13,7 +14,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 fun CatalogScreen(kind: CatalogKind, state: HomeWorkspaceState, vm: HomeWorkspaceViewModel,
-    onBack: () -> Unit, onNavigate: (String) -> Unit, onSelect: (CatalogSelection) -> Unit) {
+    onBack: () -> Unit, onNavigate: (String) -> Unit, onSelect: (CatalogSelection) -> Unit, onEditEmployee: (Long) -> Unit) {
     val allFilters by vm.catalogFilters.collectAsStateWithLifecycle()
     val filter = allFilters[kind] ?: CatalogFilters()
     val rows = state.catalog(kind)
@@ -21,6 +22,9 @@ fun CatalogScreen(kind: CatalogKind, state: HomeWorkspaceState, vm: HomeWorkspac
     val saving by vm.saving.collectAsStateWithLifecycle()
     val saveError by vm.saveError.collectAsStateWithLifecycle()
     val worker = kind == CatalogKind.EMPLOYEES || kind == CatalogKind.SUBCONTRACTORS
+    var showFilters by rememberSaveable(kind) { mutableStateOf(false) }
+    val activeFilterCount = listOf(filter.trade, filter.type, filter.status, filter.zone, filter.fromDate, filter.toDate)
+        .count { it.isNotBlank() } + (if (filter.projectId != null) 1 else 0) + (if (filter.supplierId != null) 1 else 0)
     val datesInvalid = (filter.fromDate.isNotEmpty() && !validDate(filter.fromDate)) ||
         (filter.toDate.isNotEmpty() && !validDate(filter.toDate)) ||
         (filter.fromDate.isNotEmpty() && filter.toDate.isNotEmpty() && filter.fromDate > filter.toDate)
@@ -29,24 +33,33 @@ fun CatalogScreen(kind: CatalogKind, state: HomeWorkspaceState, vm: HomeWorkspac
         item { TextButton(onClick = onBack) { Text("Volver") } }
         item { Text(kind.title, style = MaterialTheme.typography.headlineMedium) }
         item { Button(onClick = { onNavigate(kind.newRoute) }) { Text("+ Añadir") } }
-        if (worker) item { OutlinedButton(onClick = { onNavigate("assignment") }) { Text("Zona de trabajo y asignaciones") } }
+        if (worker) item { OutlinedButton(onClick = { onNavigate("assignment") }) { Text("Zonas laborales") } }
         item { OutlinedTextField(filter.query, { update(filter.copy(query = it)) }, label = { Text("Buscar en ${kind.title.lowercase()}") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
-        if (worker) item { FilterChoice("Oficio", filter.trade, rows.map { it.trade }) { update(filter.copy(trade = it)) } }
-        if (kind != CatalogKind.SUPPLIERS && kind != CatalogKind.SUBCONTRACTORS) item {
-            FilterChoice(if (kind == CatalogKind.MATERIALS) "Unidad" else "Tipo", filter.type, rows.map { it.type }) { update(filter.copy(type = it)) }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { showFilters = !showFilters }) {
+                    Text(if (showFilters) "Ocultar filtros" else "Filtros${if (activeFilterCount > 0) " · $activeFilterCount" else ""}")
+                }
+                if (filter != CatalogFilters()) TextButton(onClick = { update(CatalogFilters()) }) { Text("Limpiar") }
+            }
         }
-        if (worker || kind == CatalogKind.PROJECTS) {
-            item { FilterChoice("Estado", filter.status, if (worker) listOf("ACTIVO", "INACTIVO") else listOf("ACTIVO", "PAUSADO", "FINALIZADO", "PENDIENTE")) { update(filter.copy(status = it)) } }
-            item { FilterChoice(if (worker) "Zona de trabajo" else "Ubicación", filter.zone, rows.map { it.zone }) { update(filter.copy(zone = it)) } }
+        if (showFilters) {
+            if (worker) item { FilterChoice("Oficio", filter.trade, rows.map { it.trade }) { update(filter.copy(trade = it)) } }
+            if (kind != CatalogKind.SUPPLIERS && kind != CatalogKind.SUBCONTRACTORS) item {
+                FilterChoice(if (kind == CatalogKind.MATERIALS) "Unidad" else "Tipo", filter.type, rows.map { it.type }) { update(filter.copy(type = it)) }
+            }
+            if (worker || kind == CatalogKind.PROJECTS) {
+                item { FilterChoice("Estado", filter.status, if (worker) listOf("ACTIVO", "INACTIVO") else listOf("ACTIVO", "PAUSADO", "FINALIZADO", "PENDIENTE")) { update(filter.copy(status = it)) } }
+                item { FilterChoice(if (worker) "Zona laboral" else "Ubicación", filter.zone, rows.map { it.zone }) { update(filter.copy(zone = it)) } }
+            }
+            if (worker) item { IdFilter("Servicio / proyecto", filter.projectId, state.projects.map { it.id to it.titulo }) { update(filter.copy(projectId = it)) } }
+            if (kind == CatalogKind.MATERIALS) item { IdFilter("Proveedor", filter.supplierId, state.suppliers.map { it.id to it.nombreEmpresa }) { update(filter.copy(supplierId = it)) } }
+            if (kind == CatalogKind.PROJECTS) {
+                item { EntryField("Inicio desde (AAAA-MM-DD)", filter.fromDate, { update(filter.copy(fromDate = it)) }, true) }
+                item { EntryField("Inicio hasta (AAAA-MM-DD)", filter.toDate, { update(filter.copy(toDate = it)) }, true) }
+                if (datesInvalid) item { Text("Revisa las fechas y el orden del intervalo.", color = MaterialTheme.colorScheme.error) }
+            }
         }
-        if (worker) item { IdFilter("Servicio / proyecto", filter.projectId, state.projects.map { it.id to it.titulo }) { update(filter.copy(projectId = it)) } }
-        if (kind == CatalogKind.MATERIALS) item { IdFilter("Proveedor", filter.supplierId, state.suppliers.map { it.id to it.nombreEmpresa }) { update(filter.copy(supplierId = it)) } }
-        if (kind == CatalogKind.PROJECTS) {
-            item { EntryField("Inicio desde (AAAA-MM-DD)", filter.fromDate, { update(filter.copy(fromDate = it)) }, true) }
-            item { EntryField("Inicio hasta (AAAA-MM-DD)", filter.toDate, { update(filter.copy(toDate = it)) }, true) }
-            if (datesInvalid) item { Text("Revisa las fechas y el orden del intervalo.", color = MaterialTheme.colorScheme.error) }
-        }
-        if (filter != CatalogFilters()) item { TextButton(onClick = { update(CatalogFilters()) }) { Text("Limpiar búsqueda y filtros") } }
         item { Text("${visible.size} de ${rows.size} resultados", style = MaterialTheme.typography.labelLarge) }
         saveError?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
         when {
@@ -67,6 +80,7 @@ fun CatalogScreen(kind: CatalogKind, state: HomeWorkspaceState, vm: HomeWorkspac
                                 vm.save({ if (kind == CatalogKind.EMPLOYEES) setEmployeeActive(row.id, row.status != "ACTIVO") else setSubcontractorActive(row.id, row.status != "ACTIVO") }, {})
                             }) { Text(if (row.status == "ACTIVO") "Dar de baja" else "Reactivar") }
                         }
+                        if (kind == CatalogKind.EMPLOYEES) TextButton(onClick = { onEditEmployee(row.id) }) { Text("Editar empleado") }
                         if (kind == CatalogKind.PROJECTS) {
                             Text("${row.startDate} → ${row.endDate ?: "Sin fin previsto"}")
                             ChoiceField("Cambiar estado", row.status, listOf("ACTIVO", "PAUSADO", "FINALIZADO"), !saving) {
@@ -97,7 +111,7 @@ fun CatalogScreen(kind: CatalogKind, state: HomeWorkspaceState, vm: HomeWorkspac
         OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) { Text("$label: ${options.firstOrNull { it.first == selected }?.second ?: "Todos"}") }
         DropdownMenu(expanded, { expanded = false }) {
             DropdownMenuItem(text = { Text("Todos") }, onClick = { onChange(null); expanded = false })
-            options.forEach { (id, title) -> DropdownMenuItem(text = { Text("$title (#$id)") }, onClick = { onChange(id); expanded = false }) }
+            options.forEach { (id, title) -> DropdownMenuItem(text = { Text(title) }, onClick = { onChange(id); expanded = false }) }
         }
     }
 }

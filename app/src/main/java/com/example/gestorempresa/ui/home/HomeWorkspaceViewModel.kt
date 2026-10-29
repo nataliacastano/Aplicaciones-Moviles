@@ -22,8 +22,8 @@ data class HomeWorkspaceState(
     val obligations: List<HomeObligation> = emptyList(), val tasks: List<HomeTask> = emptyList()
 ) {
     fun workerName(kind: String, id: Long): String = if (kind == "EMPLEADO")
-        employees.firstOrNull { it.id == id }?.let { "${it.nombre} ${it.apellidos}" } ?: "Empleado #$id"
-        else subcontractors.firstOrNull { it.id == id }?.nombreComercial ?: "Subcontratado #$id"
+        employees.firstOrNull { it.id == id }?.let { "${it.nombre} ${it.apellidos}" } ?: "Empleado"
+        else subcontractors.firstOrNull { it.id == id }?.nombreComercial ?: "Subcontratado"
 
     fun summary(name: String, company: String, today: LocalDate = LocalDate.now()): HomeUiState {
         val monthly = movements.filter { it.date.startsWith(YearMonth.from(today).toString()) }

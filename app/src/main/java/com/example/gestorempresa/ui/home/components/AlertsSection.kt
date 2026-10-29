@@ -29,20 +29,20 @@ fun AlertsSection(
                 text = "AVISOS Y VENCIMIENTOS",
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFFCBD5E1)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Text(
                 text = "${alertas.size} avisos",
                 style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFFFB7185)
+                color = MaterialTheme.colorScheme.error
             )
         }
 
         if (alertas.isEmpty()) {
             Text(
                 text = "No hay avisos pendientes",
-                color = Color(0xFF94A3B8),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium
             )
         } else {
@@ -78,7 +78,7 @@ private fun AlertCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = Color(0xFF0F172A),
+        color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
             colorAlerta.copy(alpha = 0.4f)
@@ -102,7 +102,7 @@ private fun AlertCard(
                 Text(
                     text = alerta.titulo,
                     style = MaterialTheme.typography.titleSmall,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
 
                 Text(

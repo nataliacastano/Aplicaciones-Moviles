@@ -37,7 +37,7 @@ fun EmployeeListScreen(
     modifier: Modifier = Modifier
 ) {
     val visible = state.visibleEmployees
-    Surface(modifier.fillMaxSize(), color = Color(0xFF020617)) {
+    Surface(modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         LazyColumn(
             modifier = Modifier.safeDrawingPadding(),
             contentPadding = PaddingValues(16.dp),
@@ -65,10 +65,10 @@ fun EmployeeListScreen(
                     Button(onClick = onRetry) { Text("Reintentar") }
                 }
                 state.employees.isEmpty() -> item {
-                    Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A))) {
+                    Card(shape = RoundedCornerShape(16.dp)) {
                         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text("Tu equipo empieza aquí", style = MaterialTheme.typography.titleMedium)
-                            Text("Todavía no hay empleados activos. Vuelve a Inicio y pulsa + Alta empleado para añadir el primero.", color = Color(0xFF94A3B8))
+                            Text("Todavía no hay empleados activos. Vuelve a Inicio y pulsa + Alta empleado para añadir el primero.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -77,7 +77,7 @@ fun EmployeeListScreen(
                     item { Text("${visible.size} empleados", style = MaterialTheme.typography.labelLarge) }
                     items(visible, key = { it.id }) { employee ->
                         Card(onClick = { onEmployeeClick(employee.id) }, modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A))) {
+                            shape = RoundedCornerShape(16.dp)) {
                             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text("${employee.nombre} ${employee.apellidos}", style = MaterialTheme.typography.titleMedium)
                                 Text(employee.oficio.ifBlank { "Oficio sin indicar" })

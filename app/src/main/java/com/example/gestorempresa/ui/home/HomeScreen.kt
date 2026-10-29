@@ -15,7 +15,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 
-import com.example.gestorempresa.ui.home.components.WelcomeCard
 import com.example.gestorempresa.ui.home.components.KpiCard
 import com.example.gestorempresa.ui.home.components.BalanceCard
 import com.example.gestorempresa.ui.home.components.AlertsSection
@@ -43,16 +42,16 @@ fun HomeScreen(
         modifier = modifier
             .testTag("home-list")
             .fillMaxSize()
-            .background(Color(0xFF020617)),
+            .background(MaterialTheme.colorScheme.background),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
 
         item {
             Text(
-                text = "ObraControl",
+                text = "Gestión de empresa",
                 style = MaterialTheme.typography.headlineMedium,
-                color = Color.White
+                color = MaterialTheme.colorScheme.onBackground
             )
         }
 
@@ -71,21 +70,14 @@ fun HomeScreen(
         } else {
 
             item {
-                WelcomeCard(
-                    nombreAdministrador = uiState.nombreAdministrador,
-                    cargoAdministrador = uiState.cargoAdministrador
-                )
-            }
-
-            item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     KpiCard(
-                        titulo = "Trabajos activos",
+                        titulo = "Servicios activos",
                         valor = "${uiState.obrasActivas} / ${uiState.totalObras}",
-                        descripcion = "En ejecución",
+                        descripcion = "En marcha",
                         colorDescripcion = Color(0xFF34D399),
                         modifier = Modifier.weight(1f),
                         onClick = onObrasClick
@@ -130,7 +122,7 @@ fun HomeScreen(
 }
 
 @androidx.compose.ui.tooling.preview.Preview(
-    name = "Inicio ObraControl",
+    name = "Inicio · Gestión de empresa",
     showBackground = true,
     widthDp = 393,
     heightDp = 852

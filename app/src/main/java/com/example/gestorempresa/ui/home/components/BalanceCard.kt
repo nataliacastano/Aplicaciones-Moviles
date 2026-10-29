@@ -35,7 +35,7 @@ fun BalanceCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = Color(0xFF0F172A),
+        color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp
     ) {
         Column(
@@ -49,7 +49,7 @@ fun BalanceCard(
                 Text(
                     text = "BALANCE OPERATIVO MES",
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF94A3B8)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Text(
@@ -75,7 +75,7 @@ fun BalanceCard(
                     Text(
                         text = "INGRESOS",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF94A3B8)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Text(
@@ -89,7 +89,7 @@ fun BalanceCard(
                     Text(
                         text = "GASTOS",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF94A3B8)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Text(

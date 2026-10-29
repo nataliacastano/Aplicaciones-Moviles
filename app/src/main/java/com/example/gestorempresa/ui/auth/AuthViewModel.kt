@@ -158,7 +158,7 @@ class AuthViewModel @Inject constructor(
             ErrorAuth.SERVICIO_NO_CONFIGURADO -> "El servicio de acceso por correo aún no está disponible. Contacta con el responsable de la aplicación."
             ErrorAuth.SIN_CONEXION -> "No se ha podido conectar. Comprueba tu conexión a Internet y vuelve a intentarlo."
             ErrorAuth.SERVICIO_NO_DISPONIBLE -> "El servicio de acceso no está disponible en este momento. Inténtalo más tarde."
-            ErrorAuth.PERFIL_NO_DISPONIBLE -> "La cuenta no tiene los datos de su empresa en este dispositivo. Utiliza el dispositivo donde la registraste."
+            ErrorAuth.PERFIL_NO_DISPONIBLE -> "El correo y la contraseña son válidos, pero no encontramos el perfil de empresa guardado en este móvil. La app guarda ese perfil solo en el dispositivo donde se registró; si reinstalaste la app o cambiaste de móvil, no puede recuperarlo automáticamente."
             ErrorAuth.VINCULACION_NECESARIA -> "El correo ya tiene otra contraseña en el servicio de acceso. Contacta con el responsable para vincular tu cuenta anterior."
             ErrorAuth.DEMASIADAS_SOLICITUDES -> "Demasiadas solicitudes. Espera unos minutos antes de volver a intentarlo."
         }) }

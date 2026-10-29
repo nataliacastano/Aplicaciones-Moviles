@@ -2,6 +2,8 @@ package com.example.gestorempresa.data.local
 
 import android.content.Context
 import androidx.room.*
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.gestorempresa.data.local.entities.*
 import kotlinx.coroutines.flow.Flow
 
@@ -26,7 +28,9 @@ interface HomeDao {
     @Query("SELECT * FROM movimientos ORDER BY date DESC, id DESC")
     fun movements(): Flow<List<HomeMovement>>
     @Insert suspend fun addEmployee(value: EmpleadoEntity)
+    @Update suspend fun updateEmployee(value: EmpleadoEntity)
     @Insert suspend fun addProject(value: UnidadTrabajoEntity)
+    @Update suspend fun updateProject(value: UnidadTrabajoEntity)
     @Insert suspend fun addHours(value: RegistroHorasEntity)
     @Insert suspend fun addMovement(value: HomeMovement)
     @Query("SELECT * FROM subcontratados ORDER BY nombreComercial")
@@ -44,8 +48,11 @@ interface HomeDao {
     @Query("SELECT * FROM home_tasks ORDER BY dueDate, id")
     fun tasks(): Flow<List<HomeTask>>
     @Insert suspend fun addSubcontractor(value: SubcontratadoEntity)
+    @Update suspend fun updateSubcontractor(value: SubcontratadoEntity)
     @Insert suspend fun addSupplier(value: ProveedorEntity)
+    @Update suspend fun updateSupplier(value: ProveedorEntity)
     @Insert suspend fun addMaterial(value: MaterialEntity)
+    @Update suspend fun updateMaterial(value: MaterialEntity)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun setWorkerMeta(value: HomeWorkerMeta)
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun assign(value: HomeAssignment)
     @Query("DELETE FROM home_assignments WHERE workerKind = :kind AND workerId = :workerId AND projectId = :projectId")
@@ -67,6 +74,38 @@ interface HomeDao {
     suspend fun setTaskCompleted(id: Long, completed: Boolean)
     @Query("UPDATE home_obligations SET resolved = :resolved WHERE id = :id")
     suspend fun setObligationResolved(id: Long, resolved: Boolean)
+
+    @Query("DELETE FROM empleados WHERE id = :id") suspend fun deleteEmployee(id: Long)
+    @Query("DELETE FROM registros_horas WHERE empleadoId = :id") suspend fun deleteEmployeeHours(id: Long)
+    @Query("DELETE FROM home_worker_meta WHERE workerKind = 'EMPLEADO' AND workerId = :id") suspend fun deleteEmployeeMeta(id: Long)
+    @Query("DELETE FROM home_assignments WHERE workerKind = 'EMPLEADO' AND workerId = :id") suspend fun deleteEmployeeAssignments(id: Long)
+    @Query("DELETE FROM home_obligations WHERE workerKind = 'EMPLEADO' AND workerId = :id") suspend fun deleteEmployeeObligations(id: Long)
+    @Transaction suspend fun deleteEmployeeAndHistory(id: Long) {
+        deleteEmployeeHours(id); deleteEmployeeMeta(id); deleteEmployeeAssignments(id); deleteEmployeeObligations(id); deleteEmployee(id)
+    }
+
+    @Query("DELETE FROM subcontratados WHERE id = :id") suspend fun deleteSubcontractor(id: Long)
+    @Query("DELETE FROM registros_horas WHERE subcontratadoId = :id") suspend fun deleteSubcontractorHours(id: Long)
+    @Query("DELETE FROM home_worker_meta WHERE workerKind = 'SUBCONTRATADO' AND workerId = :id") suspend fun deleteSubcontractorMeta(id: Long)
+    @Query("DELETE FROM home_assignments WHERE workerKind = 'SUBCONTRATADO' AND workerId = :id") suspend fun deleteSubcontractorAssignments(id: Long)
+    @Query("DELETE FROM home_obligations WHERE workerKind = 'SUBCONTRATADO' AND workerId = :id") suspend fun deleteSubcontractorObligations(id: Long)
+    @Transaction suspend fun deleteSubcontractorAndHistory(id: Long) {
+        deleteSubcontractorHours(id); deleteSubcontractorMeta(id); deleteSubcontractorAssignments(id); deleteSubcontractorObligations(id); deleteSubcontractor(id)
+    }
+
+    @Query("DELETE FROM materiales WHERE proveedorId = :id") suspend fun deleteSupplierMaterials(id: Long)
+    @Query("DELETE FROM proveedores WHERE id = :id") suspend fun deleteSupplier(id: Long)
+    @Transaction suspend fun deleteSupplierAndMaterials(id: Long) { deleteSupplierMaterials(id); deleteSupplier(id) }
+    @Query("DELETE FROM materiales WHERE id = :id") suspend fun deleteMaterial(id: Long)
+
+    @Query("DELETE FROM registros_horas WHERE unidadTrabajoId = :id") suspend fun deleteProjectHours(id: Long)
+    @Query("DELETE FROM movimientos WHERE projectId = :id") suspend fun deleteProjectMovements(id: Long)
+    @Query("DELETE FROM home_assignments WHERE projectId = :id") suspend fun deleteProjectAssignments(id: Long)
+    @Query("DELETE FROM home_tasks WHERE projectId = :id") suspend fun deleteProjectTasks(id: Long)
+    @Query("DELETE FROM unidades_trabajo WHERE id = :id") suspend fun deleteProject(id: Long)
+    @Transaction suspend fun deleteProjectAndHistory(id: Long) {
+        deleteProjectHours(id); deleteProjectMovements(id); deleteProjectAssignments(id); deleteProjectTasks(id); deleteProject(id)
+    }
 }
 
 /** Almacén del módulo 2 por empresa; no modifica las tablas de autenticación.
@@ -76,7 +115,7 @@ interface HomeDao {
 @Database(entities = [EmpleadoEntity::class, UnidadTrabajoEntity::class,
     RegistroHorasEntity::class, HomeMovement::class, SubcontratadoEntity::class, ProveedorEntity::class,
     MaterialEntity::class, HomeWorkerMeta::class, HomeAssignment::class, HomeObligation::class,
-    HomeTask::class], version = 2, exportSchema = true,
+    HomeTask::class], version = 3, exportSchema = true,
     autoMigrations = [AutoMigration(from = 1, to = 2)])
 abstract class HomeDatabase : RoomDatabase() {
     abstract fun homeDao(): HomeDao
@@ -86,8 +125,15 @@ abstract class HomeDatabase : RoomDatabase() {
             require(companyId > 0)
             return instances.getOrPut(companyId) {
                 Room.databaseBuilder(context.applicationContext, HomeDatabase::class.java,
-                    "home_empresa_$companyId.db").build()
+                    "home_empresa_$companyId.db").addMigrations(HOME_MIGRATION_2_3).build()
             }
         }
+    }
+}
+
+private val HOME_MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE empleados ADD COLUMN numeroSeguridadSocial TEXT NOT NULL DEFAULT ''")
+        db.execSQL("UPDATE empleados SET tipoEmpleado = 'COMPLETO' WHERE tipoEmpleado = 'FIJO'")
     }
 }

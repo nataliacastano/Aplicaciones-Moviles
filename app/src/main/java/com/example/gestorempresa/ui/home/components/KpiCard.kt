@@ -22,7 +22,7 @@ fun KpiCard(
     titulo: String,
     valor: String,
     descripcion: String,
-    colorDescripcion: Color = Color(0xFF94A3B8),
+    colorDescripcion: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null
 ) {
@@ -36,7 +36,7 @@ fun KpiCard(
                 }
             ),
         shape = RoundedCornerShape(16.dp),
-        color = Color(0xFF0F172A),
+        color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp
     ) {
         Column(
@@ -48,14 +48,14 @@ fun KpiCard(
             Text(
                 text = titulo.uppercase(),
                 style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFF94A3B8)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Text(
                 text = valor,
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Text(
