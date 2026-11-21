@@ -1,8 +1,5 @@
 package com.example.gestorempresa.ui.home
 
-import android.content.ActivityNotFoundException
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -20,6 +17,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import com.example.gestorempresa.ui.advanced.communication.*
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -30,15 +29,11 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun MessagingScreen(state: HomeWorkspaceState, onBack: () -> Unit) {
     val context = LocalContext.current
-    val templates = linkedMapOf(
-        "Indicaciones para hoy" to "Hola [nombre], hoy debes acudir a [lugar] a las [hora].",
-        "Asignación a un servicio" to "Hola [nombre], te hemos asignado al servicio [servicio] el día [fecha].",
-        "Recordatorio de documentación" to "Hola [nombre], recuerda revisar la documentación pendiente: [documento].",
-        "Confirmar horario" to "Hola [nombre], ¿puedes confirmar que has recibido tu horario?",
-        "Mensaje personalizado" to ""
-    )
+    // Plantillas compartidas con el botón de comunicación de las fichas (funciones avanzadas).
+    val templates = messageTemplates.associate { it.title to it.text }
     var selectedTemplate by rememberSaveable { mutableStateOf(templates.keys.first()) }
     var message by rememberSaveable { mutableStateOf(templates.values.first()) }
+    var composingFor by remember { mutableStateOf<Contact?>(null) }
     val people = state.employees.map {
         Contact(it.id, "${it.nombre} ${it.apellidos}", "Empleado · ${it.oficio}", it.telefono, it.email)
     } + state.subcontractors.map {
@@ -46,7 +41,7 @@ fun MessagingScreen(state: HomeWorkspaceState, onBack: () -> Unit) {
     }
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxSize()) {
         item { Text("Mensajería", style = MaterialTheme.typography.headlineMedium) }
-        item { Text("Contacta con empleados y subcontratados por WhatsApp o correo.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        item { Text("Contacta con empleados y subcontratados por WhatsApp, correo o ambos. Los huecos como [LUGAR] o [HORA] se pueden rellenar con «Personalizar».", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         item { ChoiceField("Mensajes frecuentes", selectedTemplate, templates.keys.toList(), true) { choice -> selectedTemplate = choice; message = templates[choice].orEmpty() } }
         item { OutlinedTextField(value = message, onValueChange = { message = it }, label = { Text("Mensaje (puedes editarlo)") }, minLines = 3, modifier = Modifier.fillMaxWidth()) }
         if (people.isEmpty()) item { EmptyCatalog("Aún no hay empleados ni subcontratados para contactar.") }
@@ -57,24 +52,30 @@ fun MessagingScreen(state: HomeWorkspaceState, onBack: () -> Unit) {
                     Text(person.description, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (person.phone.isNotBlank()) Text(person.phone)
                     if (person.email.isNotBlank()) Text(person.email)
-                    val personalizedMessage = message.replace("[nombre]", person.name)
+                    val personalizedMessage = fillTemplate(message, mapOf("NOMBRE" to person.name.substringBefore(' ')))
                     androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(enabled = person.phone.isNotBlank() && personalizedMessage.isNotBlank(), onClick = {
-                            val number = person.phone.filter { it.isDigit() }
-                            if (number.isNotEmpty()) try {
-                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$number?text=${Uri.encode(personalizedMessage)}")))
-                            } catch (_: ActivityNotFoundException) { }
+                        OutlinedButton(enabled = whatsappNumber(person.phone) != null && personalizedMessage.isNotBlank(), onClick = {
+                            sendMessage(context, Channel.WHATSAPP, person.phone, person.email, "Mensaje de empresa", personalizedMessage)
                         }) { Text("WhatsApp") }
                         Button(enabled = person.email.isNotBlank() && personalizedMessage.isNotBlank(), onClick = {
-                            try { context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.fromParts("mailto", person.email, null))
-                                .putExtra(Intent.EXTRA_SUBJECT, "Mensaje de empresa").putExtra(Intent.EXTRA_TEXT, personalizedMessage)) }
-                            catch (_: ActivityNotFoundException) { }
+                            sendMessage(context, Channel.EMAIL, person.phone, person.email, "Mensaje de empresa", personalizedMessage)
                         }) { Text("Correo") }
+                    }
+                    androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(enabled = whatsappNumber(person.phone) != null && person.email.isNotBlank() && personalizedMessage.isNotBlank(), onClick = {
+                            sendMessage(context, Channel.BOTH, person.phone, person.email, "Mensaje de empresa", personalizedMessage)
+                        }) { Text("WhatsApp + Email") }
+                        androidx.compose.material3.TextButton(onClick = { composingFor = person }) { Text("Personalizar") }
                     }
                 }
             }
         }
         item { androidx.compose.material3.TextButton(onClick = onBack) { Text("Volver a Inicio") } }
+    }
+    composingFor?.let { person ->
+        // Los subcontratados usan id negativo en esta lista para no chocar con los empleados.
+        MessageComposerDialog(ContactInfo(if (person.id < 0) "SUBCONTRATADO" else "EMPLEADO", kotlin.math.abs(person.id), person.name,
+            person.phone, person.email), state) { composingFor = null }
     }
 }
 

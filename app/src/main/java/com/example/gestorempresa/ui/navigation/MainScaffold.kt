@@ -1,6 +1,15 @@
 package com.example.gestorempresa.ui.navigation
 
+import android.Manifest
+import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.gestorempresa.ui.advanced.dates.DueDateNotifications
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -55,6 +64,26 @@ fun MainScaffold(
     settingsViewModel: SettingsViewModel
 ) {
     var seccion by rememberSaveable { mutableStateOf(SeccionPrincipal.INICIO) }
+    val context = LocalContext.current
+    val ajustes by settingsViewModel.ui.collectAsStateWithLifecycle()
+    val preferencias = ajustes.ajustes
+    val empresaId = sesion.empresa.id
+
+    // Avisos de vencimientos (funciones avanzadas): se reprograman cada vez que cambian los Ajustes.
+    LaunchedEffect(empresaId, preferencias.avisosVencimientos, preferencias.avisosTareas, preferencias.diasAntelacion) {
+        DueDateNotifications.schedule(context, empresaId, preferencias.diasAntelacion, preferencias.avisosVencimientos, preferencias.avisosTareas)
+    }
+    // Android 13 o superior pide permiso para mostrar notificaciones; se pregunta una vez por sesión.
+    var permisoPedido by rememberSaveable { mutableStateOf(false) }
+    val pedirPermiso = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(preferencias.avisosVencimientos, preferencias.avisosTareas) {
+        if (!permisoPedido && Build.VERSION.SDK_INT >= 33 && (preferencias.avisosVencimientos || preferencias.avisosTareas) &&
+            !DueDateNotifications.canNotify(context)) {
+            permisoPedido = true
+            pedirPermiso.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+    val cerrarSesion = { DueDateNotifications.cancel(context); onCerrarSesion() }
 
     // Guarda el estado de cada sección (por ejemplo, el listado abierto en Inicio)
     // para que no se pierda al cambiar de pestaña y volver.
@@ -83,12 +112,17 @@ fun MainScaffold(
         Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
             estadoSecciones.SaveableStateProvider(seccion.name) {
                 when (seccion) {
-                    SeccionPrincipal.INICIO -> HomeListsContent(session = sesion)
+                    SeccionPrincipal.INICIO -> HomeListsContent(session = sesion, warnDays = preferencias.diasAntelacion,
+                        onNotifyNow = {
+                            DueDateNotifications.runNow(context, empresaId, preferencias.diasAntelacion, true, preferencias.avisosTareas)
+                            val mensaje = if (DueDateNotifications.canNotify(context)) "Revisando vencimientos…" else "Activa las notificaciones de la app para recibir avisos"
+                            Toast.makeText(context, mensaje, Toast.LENGTH_SHORT).show()
+                        })
                     SeccionPrincipal.PERFIL -> ProfileScreen(profileViewModel)
                     SeccionPrincipal.AJUSTES -> SettingsScreen(
                         viewModel = settingsViewModel,
                         onAbrirPerfil = { seccion = SeccionPrincipal.PERFIL },
-                        onCerrarSesion = onCerrarSesion
+                        onCerrarSesion = cerrarSesion
                     )
                 }
             }

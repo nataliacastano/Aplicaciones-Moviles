@@ -82,4 +82,31 @@ class HomeDatabaseTest {
         first.unassign("EMPLEADO", employeeId, projectId)
         assertTrue(first.assignments().first().isEmpty())
     }
+
+    @Test fun savesAttachmentsAndMaterialUsesAndDeletesThemWithTheirOwner() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val dao = HomeDatabase.forCompany(context, 900010).homeDao()
+        dao.addProject(UnidadTrabajoEntity(titulo = "Obra", tipo = "PROYECTO", clienteNombre = "", direccionUbicacion = "Murcia", fechaInicio = "2026-11-01"))
+        dao.addSupplier(ProveedorEntity(nombreEmpresa = "Áridos", cif = "", telefono = "", email = "", personaContacto = ""))
+        val projectId = dao.projects().first().single().id
+        val supplierId = dao.suppliers().first().single().id
+        dao.addMaterial(MaterialEntity(proveedorId = supplierId, nombreMaterial = "Arena", unidadMedida = "saco", precioUnitario = 3.0))
+        val materialId = dao.materials().first().single().id
+        dao.addMaterialUse(ConsumoMaterialEntity(unidadTrabajoId = projectId, materialId = materialId, cantidad = 2.0, precioUnitarioAplicado = 3.0, fecha = "2026-11-02"))
+        dao.addAttachment(HomeAttachment(ownerKind = "PROYECTO", ownerId = projectId, type = "FOTO", category = "FOTO", name = "Fachada",
+            path = "/f.jpg", mimeType = "image/jpeg", createdAt = "2026-11-02"))
+        dao.addAttachment(HomeAttachment(ownerKind = "MATERIAL", ownerId = materialId, type = "DOCUMENTO", category = "CERTIFICADO", name = "Ficha",
+            path = "/m.pdf", mimeType = "application/pdf", createdAt = "2026-11-02", expiresAt = "2027-01-01"))
+        dao.setProjectLocation(projectId, 37.98, -1.13)
+        assertEquals(37.98, dao.projects().first().single().latitud!!, 0.0001)
+        assertEquals(2, dao.attachments().first().size)
+        assertEquals(1, dao.materialUses().first().size)
+
+        dao.deleteProjectAndHistory(projectId)
+        assertTrue(dao.materialUses().first().isEmpty())
+        assertEquals(listOf("Ficha"), dao.attachments().first().map { it.name })
+        dao.deleteSupplierAndMaterials(supplierId)
+        assertTrue(dao.attachments().first().isEmpty())
+        assertTrue(dao.materials().first().isEmpty())
+    }
 }

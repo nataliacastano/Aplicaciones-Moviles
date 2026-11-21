@@ -81,7 +81,8 @@ interface HomeDao {
     @Query("DELETE FROM home_assignments WHERE workerKind = 'EMPLEADO' AND workerId = :id") suspend fun deleteEmployeeAssignments(id: Long)
     @Query("DELETE FROM home_obligations WHERE workerKind = 'EMPLEADO' AND workerId = :id") suspend fun deleteEmployeeObligations(id: Long)
     @Transaction suspend fun deleteEmployeeAndHistory(id: Long) {
-        deleteEmployeeHours(id); deleteEmployeeMeta(id); deleteEmployeeAssignments(id); deleteEmployeeObligations(id); deleteEmployee(id)
+        deleteEmployeeHours(id); deleteEmployeeMeta(id); deleteEmployeeAssignments(id); deleteEmployeeObligations(id)
+        deleteAttachmentsOf("EMPLEADO", id); deleteEmployee(id)
     }
 
     @Query("DELETE FROM subcontratados WHERE id = :id") suspend fun deleteSubcontractor(id: Long)
@@ -90,22 +91,47 @@ interface HomeDao {
     @Query("DELETE FROM home_assignments WHERE workerKind = 'SUBCONTRATADO' AND workerId = :id") suspend fun deleteSubcontractorAssignments(id: Long)
     @Query("DELETE FROM home_obligations WHERE workerKind = 'SUBCONTRATADO' AND workerId = :id") suspend fun deleteSubcontractorObligations(id: Long)
     @Transaction suspend fun deleteSubcontractorAndHistory(id: Long) {
-        deleteSubcontractorHours(id); deleteSubcontractorMeta(id); deleteSubcontractorAssignments(id); deleteSubcontractorObligations(id); deleteSubcontractor(id)
+        deleteSubcontractorHours(id); deleteSubcontractorMeta(id); deleteSubcontractorAssignments(id); deleteSubcontractorObligations(id)
+        deleteAttachmentsOf("SUBCONTRATADO", id); deleteSubcontractor(id)
     }
 
     @Query("DELETE FROM materiales WHERE proveedorId = :id") suspend fun deleteSupplierMaterials(id: Long)
     @Query("DELETE FROM proveedores WHERE id = :id") suspend fun deleteSupplier(id: Long)
-    @Transaction suspend fun deleteSupplierAndMaterials(id: Long) { deleteSupplierMaterials(id); deleteSupplier(id) }
-    @Query("DELETE FROM materiales WHERE id = :id") suspend fun deleteMaterial(id: Long)
+    @Query("DELETE FROM consumos_materiales WHERE materialId IN (SELECT id FROM materiales WHERE proveedorId = :id)")
+    suspend fun deleteSupplierMaterialUses(id: Long)
+    @Query("DELETE FROM home_attachments WHERE ownerKind = 'MATERIAL' AND ownerId IN (SELECT id FROM materiales WHERE proveedorId = :id)")
+    suspend fun deleteSupplierMaterialAttachments(id: Long)
+    @Transaction suspend fun deleteSupplierAndMaterials(id: Long) {
+        deleteSupplierMaterialUses(id); deleteSupplierMaterialAttachments(id); deleteSupplierMaterials(id)
+        deleteAttachmentsOf("PROVEEDOR", id); deleteSupplier(id)
+    }
+    @Query("DELETE FROM materiales WHERE id = :id") suspend fun deleteMaterialOnly(id: Long)
+    @Query("DELETE FROM consumos_materiales WHERE materialId = :id") suspend fun deleteMaterialUsesOf(id: Long)
+    @Transaction suspend fun deleteMaterial(id: Long) { deleteMaterialUsesOf(id); deleteAttachmentsOf("MATERIAL", id); deleteMaterialOnly(id) }
 
     @Query("DELETE FROM registros_horas WHERE unidadTrabajoId = :id") suspend fun deleteProjectHours(id: Long)
     @Query("DELETE FROM movimientos WHERE projectId = :id") suspend fun deleteProjectMovements(id: Long)
     @Query("DELETE FROM home_assignments WHERE projectId = :id") suspend fun deleteProjectAssignments(id: Long)
     @Query("DELETE FROM home_tasks WHERE projectId = :id") suspend fun deleteProjectTasks(id: Long)
+    @Query("DELETE FROM consumos_materiales WHERE unidadTrabajoId = :id") suspend fun deleteProjectMaterialUses(id: Long)
     @Query("DELETE FROM unidades_trabajo WHERE id = :id") suspend fun deleteProject(id: Long)
     @Transaction suspend fun deleteProjectAndHistory(id: Long) {
-        deleteProjectHours(id); deleteProjectMovements(id); deleteProjectAssignments(id); deleteProjectTasks(id); deleteProject(id)
+        deleteProjectHours(id); deleteProjectMovements(id); deleteProjectAssignments(id); deleteProjectTasks(id)
+        deleteProjectMaterialUses(id); deleteAttachmentsOf("PROYECTO", id); deleteProject(id)
     }
+
+    // --- Funciones avanzadas (miembro 5): fotos, documentos, ubicación y consumo de materiales ---
+    @Query("SELECT * FROM home_attachments ORDER BY createdAt DESC, id DESC") fun attachments(): Flow<List<HomeAttachment>>
+    @Insert suspend fun addAttachment(value: HomeAttachment): Long
+    @Query("DELETE FROM home_attachments WHERE id = :id") suspend fun deleteAttachment(id: Long)
+    @Query("DELETE FROM home_attachments WHERE ownerKind = :kind AND ownerId = :id") suspend fun deleteAttachmentsOf(kind: String, id: Long)
+    @Query("SELECT * FROM consumos_materiales ORDER BY fecha DESC, id DESC") fun materialUses(): Flow<List<ConsumoMaterialEntity>>
+    @Insert suspend fun addMaterialUse(value: ConsumoMaterialEntity)
+    @Query("DELETE FROM consumos_materiales WHERE id = :id") suspend fun deleteMaterialUse(id: Long)
+    @Query("UPDATE empleados SET fotoUrl = :path WHERE id = :id") suspend fun setEmployeePhoto(id: Long, path: String?)
+    @Query("UPDATE subcontratados SET fotoUrl = :path WHERE id = :id") suspend fun setSubcontractorPhoto(id: Long, path: String?)
+    @Query("UPDATE unidades_trabajo SET latitud = :latitude, longitud = :longitude WHERE id = :id")
+    suspend fun setProjectLocation(id: Long, latitude: Double?, longitude: Double?)
 }
 
 /** Almacén del módulo 2 por empresa; no modifica las tablas de autenticación.
@@ -115,8 +141,9 @@ interface HomeDao {
 @Database(entities = [EmpleadoEntity::class, UnidadTrabajoEntity::class,
     RegistroHorasEntity::class, HomeMovement::class, SubcontratadoEntity::class, ProveedorEntity::class,
     MaterialEntity::class, HomeWorkerMeta::class, HomeAssignment::class, HomeObligation::class,
-    HomeTask::class], version = 3, exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2)])
+    HomeTask::class, HomeAttachment::class, ConsumoMaterialEntity::class], version = 4, exportSchema = true,
+    // 3 → 4 solo crea las tablas de adjuntos y de consumo de materiales (funciones avanzadas).
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 3, to = 4)])
 abstract class HomeDatabase : RoomDatabase() {
     abstract fun homeDao(): HomeDao
     companion object {

@@ -3,6 +3,12 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- El mapa (OpenStreetMap) comprueba si hay conexión antes de descargar teselas. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Avisos de vencimientos (Android 13 o superior pide permiso al usuario). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Las fotos se hacen con la app de cámara del sistema, así que no hace falta el permiso CAMERA. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <application
         android:name=".GestorEmpresaApp"
         android:allowBackup="false"
@@ -25,6 +31,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Comparte fotos y documentos con la cámara, visores de PDF, WhatsApp o el correo sin exponer rutas internas. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

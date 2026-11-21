@@ -13,6 +13,15 @@ import androidx.lifecycle.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.gestorempresa.data.local.HomeDatabase
+import com.example.gestorempresa.data.media.AttachmentStorage
+import com.example.gestorempresa.ui.advanced.AdvancedDetailFooter
+import com.example.gestorempresa.ui.advanced.AdvancedDetailHeader
+import com.example.gestorempresa.ui.advanced.dates.CalendarScreen
+import com.example.gestorempresa.ui.advanced.documents.AttachmentViewerScreen
+import com.example.gestorempresa.ui.advanced.filesOwnedBy
+import com.example.gestorempresa.ui.advanced.map.LocationPickerScreen
+import com.example.gestorempresa.ui.advanced.map.ProjectsMapScreen
+import com.example.gestorempresa.ui.advanced.stats.StatsScreen
 import com.example.gestorempresa.domain.auth.SesionUsuario
 import com.example.gestorempresa.ui.detail.DetailScreen
 import com.example.gestorempresa.ui.detail.DetailViewModel
@@ -23,7 +32,7 @@ import kotlinx.coroutines.launch
 /** El miembro 3 recibe tipo e id mediante onOpenDetails, sin duplicar sus pantallas. */
 @Composable
 fun HomeListsContent(session: SesionUsuario, modifier: Modifier = Modifier,
-    onOpenDetails: ((CatalogSelection) -> Unit)? = null) {
+    onOpenDetails: ((CatalogSelection) -> Unit)? = null, warnDays: Int = 15, onNotifyNow: () -> Unit = {}) {
     val context = LocalContext.current.applicationContext
     val companyId = session.empresa.id
     val owner = remember(companyId, session.usuario.id) {
@@ -31,6 +40,8 @@ fun HomeListsContent(session: SesionUsuario, modifier: Modifier = Modifier,
     }
     DisposableEffect(owner) { onDispose { owner.viewModelStore.clear() } }
     val dao = remember(companyId) { HomeDatabase.forCompany(context, companyId).homeDao() }
+    // Fotos y documentos de la empresa (funciones avanzadas).
+    val storage = remember(companyId) { AttachmentStorage(context, companyId) }
     val factory = remember(dao) {
         object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -50,6 +61,10 @@ fun HomeListsContent(session: SesionUsuario, modifier: Modifier = Modifier,
     var selectedDetail by remember(companyId) { mutableStateOf<CatalogSelection?>(null) }
     var deletingItem by remember(companyId) { mutableStateOf<CatalogSelection?>(null) }
     var notice by remember { mutableStateOf<HomeAlert?>(null) }
+    var viewingAttachmentId by rememberSaveable(companyId) { mutableStateOf<Long?>(null) }
+    var pickingLocationId by rememberSaveable(companyId) { mutableStateOf<Long?>(null) }
+    // Conserva la posición de la ficha al volver del visor de documentos o del selector de ubicación.
+    val detailListState = remember(selectedDetail) { androidx.compose.foundation.lazy.LazyListState() }
     val saving by workspace.saving.collectAsStateWithLifecycle()
     val saveError by workspace.saveError.collectAsStateWithLifecycle()
     fun navigate(route: String) {
@@ -68,10 +83,14 @@ fun HomeListsContent(session: SesionUsuario, modifier: Modifier = Modifier,
     BackHandler(destination != "home") { navigate("home") }
     BackHandler(selectedDetail != null) { selectedDetail = null }
     BackHandler(drawerState.isOpen) { scope.launch { drawerState.close() } }
+    BackHandler(pickingLocationId != null) { pickingLocationId = null }
+    BackHandler(viewingAttachmentId != null) { viewingAttachmentId = null }
     val kind = CatalogKind.entries.firstOrNull { it.name == destination }
     val activity = destination in listOf("obligations", "tasks", "assignments")
     // La barra y el menú solo se muestran en las secciones principales, no en formularios ni detalles.
-    val showMenu = selectedDetail == null && (destination == "home" || kind != null || activity || destination == "messaging")
+    val overlay = viewingAttachmentId != null || pickingLocationId != null
+    val showMenu = !overlay && selectedDetail == null && (destination == "home" || kind != null || activity ||
+        destination in listOf("messaging", "map", "stats", "calendar"))
     val alerts = remember(state.obligations, state.tasks, state.projects) { state.summary("", "").listaAlertas }
     HomeModuleTheme {
         ModalNavigationDrawer(
@@ -98,10 +117,29 @@ fun HomeListsContent(session: SesionUsuario, modifier: Modifier = Modifier,
                     }
                     Box(Modifier.weight(1f)) {
                         when {
+                            viewingAttachmentId != null -> {
+                                val file = state.attachments.firstOrNull { it.id == viewingAttachmentId }
+                                if (file == null) LaunchedEffect(Unit) { viewingAttachmentId = null }
+                                else AttachmentViewerScreen(file, state.attachmentOwnerName(file), storage, onBack = { viewingAttachmentId = null },
+                                    onDelete = { workspace.save({ deleteAttachment(file.id); storage.delete(file.path) }) { viewingAttachmentId = null } })
+                            }
+                            pickingLocationId != null -> {
+                                val project = state.projects.firstOrNull { it.id == pickingLocationId }
+                                if (project == null) LaunchedEffect(Unit) { pickingLocationId = null }
+                                else LocationPickerScreen(project, workspace) { pickingLocationId = null }
+                            }
                             selectedDetail != null -> DetailScreen(
                                 content = remember(selectedDetail, state) { DetailViewModel(selectedDetail!!, state).content },
                                 onBack = { selectedDetail = null },
                                 onOpenRelated = { selectedDetail = it },
+                                listState = detailListState,
+                                header = { AdvancedDetailHeader(selectedDetail!!, state, workspace, storage) },
+                                footer = {
+                                    AdvancedDetailFooter(selectedDetail!!, state, workspace, storage, session.empresa.nombre,
+                                        onOpenAttachment = { viewingAttachmentId = it.id },
+                                        onOpenMap = { selectedDetail = null; destination = "map" },
+                                        onPickLocation = { pickingLocationId = it })
+                                },
                                 actions = {
                                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                         if (selectedDetail?.kind == CatalogKind.EMPLOYEES) {
@@ -129,6 +167,11 @@ fun HomeListsContent(session: SesionUsuario, modifier: Modifier = Modifier,
                                 }
                             )
                             destination == "messaging" -> MessagingScreen(state) { navigate("home") }
+                            destination == "map" -> ProjectsMapScreen(state,
+                                onOpenProject = { selectedDetail = CatalogSelection(CatalogKind.PROJECTS, it) },
+                                onPickLocation = { pickingLocationId = it })
+                            destination == "stats" -> StatsScreen(state)
+                            destination == "calendar" -> CalendarScreen(state, warnDays, onOpen = { selectedDetail = it }, onNotifyNow = onNotifyNow)
                             kind != null -> CatalogScreen(kind, state, workspace, { navigate("home") }, ::navigate,
                                 onSelect = { selection -> if (onOpenDetails != null) onOpenDetails(selection) else selectedDetail = selection },
                                 onEditEmployee = { employeeId -> editingEmployeeId = employeeId; destination = "employee-edit" })
@@ -172,6 +215,8 @@ fun HomeListsContent(session: SesionUsuario, modifier: Modifier = Modifier,
                     color = if (saveError != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant) },
                 confirmButton = {
                     Button(enabled = !saving, onClick = {
+                        // Fotos y documentos que hay que borrar del móvil cuando se elimine el registro.
+                        val files = state.filesOwnedBy(selection)
                         workspace.save({
                             when (selection.kind) {
                                 CatalogKind.EMPLOYEES -> deleteEmployeeAndHistory(selection.id)
@@ -180,6 +225,7 @@ fun HomeListsContent(session: SesionUsuario, modifier: Modifier = Modifier,
                                 CatalogKind.SUPPLIERS -> deleteSupplierAndMaterials(selection.id)
                                 CatalogKind.MATERIALS -> deleteMaterial(selection.id)
                             }
+                            files.forEach { storage.delete(it) }
                         }) {
                             deletingItem = null
                             selectedDetail = null

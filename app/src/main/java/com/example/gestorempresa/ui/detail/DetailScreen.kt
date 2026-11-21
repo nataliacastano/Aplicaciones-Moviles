@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -17,12 +19,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.example.gestorempresa.ui.home.CatalogKind
 import com.example.gestorempresa.ui.home.CatalogSelection
 
 @Composable
 fun DetailScreen(content: DetailContent, onBack: () -> Unit, modifier: Modifier = Modifier,
-    actions: @Composable () -> Unit = {}, onOpenRelated: (CatalogSelection) -> Unit = {}) {
-    LazyColumn(modifier = modifier.fillMaxSize().testTag("detail-screen"), contentPadding = PaddingValues(16.dp),
+    actions: @Composable () -> Unit = {}, onOpenRelated: (CatalogSelection) -> Unit = {},
+    header: @Composable () -> Unit = {}, footer: @Composable () -> Unit = {},
+    listState: LazyListState = rememberLazyListState()) {
+    LazyColumn(modifier = modifier.fillMaxSize().testTag("detail-screen"), state = listState, contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { TextButton(onClick = onBack) { Text("Volver al listado") } }
         item {
@@ -31,6 +36,8 @@ fun DetailScreen(content: DetailContent, onBack: () -> Unit, modifier: Modifier 
                 Text(content.subtitle, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        // Foto y comunicación (funciones avanzadas del miembro 5).
+        item(key = "advanced-header") { header() }
         content.sections.forEach { section ->
             item(key = "section-${section.title}") {
                 Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp),
@@ -41,13 +48,17 @@ fun DetailScreen(content: DetailContent, onBack: () -> Unit, modifier: Modifier 
                             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text(field.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text(field.value, style = MaterialTheme.typography.bodyLarge)
-                                field.related?.let { related -> TextButton(onClick = { onOpenRelated(related) }) { Text("Abrir material") } }
+                                field.related?.let { related -> TextButton(onClick = { onOpenRelated(related) }) {
+                                    Text(when (related.kind) { CatalogKind.MATERIALS -> "Abrir material"; CatalogKind.SUPPLIERS -> "Abrir proveedor"; else -> "Abrir ficha" })
+                                } }
                             }
                         }
                     }
                 }
             }
         }
+        // Mapa, fotos, materiales y documentos (funciones avanzadas del miembro 5).
+        item(key = "advanced-footer") { footer() }
         item { actions() }
     }
 }

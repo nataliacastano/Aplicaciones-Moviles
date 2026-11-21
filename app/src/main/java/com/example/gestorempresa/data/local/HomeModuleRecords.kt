@@ -1,6 +1,7 @@
 package com.example.gestorempresa.data.local
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /** workerKind: EMPLEADO o SUBCONTRATADO. La zona laboral nunca se deduce de la residencia. */
@@ -29,4 +30,24 @@ data class HomeTask(
     val projectId: Long,
     val dueDate: String,
     val completed: Boolean = false
+)
+
+/**
+ * Archivo adjunto guardado en el almacenamiento interno de la app (fotos y documentos).
+ * ownerKind: EMPLEADO, SUBCONTRATADO, PROYECTO, PROVEEDOR o MATERIAL.
+ * type: FOTO o DOCUMENTO. category: CONTRATO, CERTIFICADO, CURSO, MEDICO, LABORAL, PRESUPUESTO, FACTURA, INFORME, OTRO.
+ * expiresAt (AAAA-MM-DD) permite avisar antes de que caduque un contrato o certificado.
+ */
+@Entity(tableName = "home_attachments", indices = [Index(value = ["ownerKind", "ownerId"])])
+data class HomeAttachment(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val ownerKind: String,
+    val ownerId: Long,
+    val type: String,
+    val category: String,
+    val name: String,
+    val path: String,
+    val mimeType: String,
+    val createdAt: String,
+    val expiresAt: String? = null
 )

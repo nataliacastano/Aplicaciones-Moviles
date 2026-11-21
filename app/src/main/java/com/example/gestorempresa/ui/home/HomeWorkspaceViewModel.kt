@@ -19,11 +19,21 @@ data class HomeWorkspaceState(
     val subcontractors: List<SubcontratadoEntity> = emptyList(),
     val suppliers: List<ProveedorEntity> = emptyList(), val materials: List<MaterialEntity> = emptyList(),
     val workerMeta: List<HomeWorkerMeta> = emptyList(), val assignments: List<HomeAssignment> = emptyList(),
-    val obligations: List<HomeObligation> = emptyList(), val tasks: List<HomeTask> = emptyList()
+    val obligations: List<HomeObligation> = emptyList(), val tasks: List<HomeTask> = emptyList(),
+    val attachments: List<HomeAttachment> = emptyList(), val materialUses: List<ConsumoMaterialEntity> = emptyList()
 ) {
     fun workerName(kind: String, id: Long): String = if (kind == "EMPLEADO")
         employees.firstOrNull { it.id == id }?.let { "${it.nombre} ${it.apellidos}" } ?: "Empleado"
         else subcontractors.firstOrNull { it.id == id }?.nombreComercial ?: "Subcontratado"
+
+    /** Nombre legible del registro al que pertenece un adjunto. */
+    fun attachmentOwnerName(file: HomeAttachment): String = when (file.ownerKind) {
+        "EMPLEADO", "SUBCONTRATADO" -> workerName(file.ownerKind, file.ownerId)
+        "PROYECTO" -> projects.firstOrNull { it.id == file.ownerId }?.titulo ?: "Servicio"
+        "PROVEEDOR" -> suppliers.firstOrNull { it.id == file.ownerId }?.nombreEmpresa ?: "Proveedor"
+        "MATERIAL" -> materials.firstOrNull { it.id == file.ownerId }?.nombreMaterial ?: "Material"
+        else -> "Registro"
+    }
 
     fun summary(name: String, company: String, today: LocalDate = LocalDate.now()): HomeUiState {
         val monthly = movements.filter { it.date.startsWith(YearMonth.from(today).toString()) }
@@ -36,10 +46,14 @@ data class HomeWorkspaceState(
         val obligationAlerts = due.map { record -> HomeAlert(0, record.title,
             "${workerName(record.workerKind, record.workerId)} · ${record.dueDate?.let { if (it <= today.toString()) "Vencido: $it" else "Vence: $it" } ?: "Documentación pendiente"}",
             AlertType.DOCUMENTACION, record.dueDate != null && record.dueDate <= today.toString(), "obligations", record.id) }
+        // Contratos, certificados y otros documentos adjuntos con fecha de caducidad (funciones avanzadas).
+        val documentAlerts = attachments.filter { it.expiresAt != null && it.expiresAt <= today.plusDays(30).toString() }.map { file ->
+            HomeAlert(0, file.name, "${attachmentOwnerName(file)} · ${if (file.expiresAt!! <= today.toString()) "Caducado: ${file.expiresAt}" else "Caduca: ${file.expiresAt}"}",
+                AlertType.DOCUMENTACION, file.expiresAt <= today.toString(), "calendar", file.id) }
         val pending = tasks.filter { !it.completed }.sortedBy { it.dueDate }
         val taskAlerts = pending.filter { it.dueDate <= today.toString() }.map { HomeAlert(0, it.title,
             "Tarea pendiente: ${it.dueDate}", AlertType.GENERAL, true, "tasks", it.id) }
-        val warnings = (projectAlerts + obligationAlerts + taskAlerts).sortedByDescending { it.urgente }.mapIndexed { i, alert -> alert.copy(id = i) }
+        val warnings = (projectAlerts + obligationAlerts + documentAlerts + taskAlerts).sortedByDescending { it.urgente }.mapIndexed { i, alert -> alert.copy(id = i) }
         return HomeUiState(nombreAdministrador = name, cargoAdministrador = company,
             empleados = employees.count { it.activo }, subcontratados = subcontractors.count { it.activo },
             totalObras = projects.size, serviciosActivos = projects.count { it.estado == "ACTIVO" }, obrasActivas = projects.count { it.estado == "ACTIVO" },
@@ -70,9 +84,11 @@ open class HomeWorkspaceViewModel(val dao: HomeDao) : ViewModel() {
             val core = combine(dao.employees(), dao.projects(), dao.hours(), dao.movements()) { e, p, h, m -> HomeWorkspaceState(e, p, h, m, loading = false) }
             val catalogs = combine(dao.subcontractors(), dao.suppliers(), dao.materials(), dao.workerMeta()) { s, p, m, z ->
                 HomeWorkspaceState(subcontractors = s, suppliers = p, materials = m, workerMeta = z) }
-            val activity = combine(dao.assignments(), dao.obligations(), dao.tasks()) { a, o, t -> HomeWorkspaceState(assignments = a, obligations = o, tasks = t) }
+            val activity = combine(dao.assignments(), dao.obligations(), dao.tasks(), dao.attachments(), dao.materialUses()) { a, o, t, f, u ->
+                HomeWorkspaceState(assignments = a, obligations = o, tasks = t, attachments = f, materialUses = u) }
             combine(core, catalogs, activity) { c, l, a -> c.copy(subcontractors = l.subcontractors, suppliers = l.suppliers,
-                materials = l.materials, workerMeta = l.workerMeta, assignments = a.assignments, obligations = a.obligations, tasks = a.tasks) }
+                materials = l.materials, workerMeta = l.workerMeta, assignments = a.assignments, obligations = a.obligations, tasks = a.tasks,
+                attachments = a.attachments, materialUses = a.materialUses) }
                 .catch { emit(HomeWorkspaceState(loading = false, error = "No se han podido cargar los datos. Pulsa Reintentar.")) }
                 .collect { mutableState.value = it }
         }

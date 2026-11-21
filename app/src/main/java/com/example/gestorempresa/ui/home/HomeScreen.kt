@@ -109,6 +109,8 @@ fun HomeScreen(
                 )
             }
 
+            item { com.example.gestorempresa.ui.advanced.AdvancedShortcuts(onSectionClick) }
+
             item { HomeSummarySections(uiState, onSectionClick) }
 
             item {

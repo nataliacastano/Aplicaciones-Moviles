@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icono de los avisos de vencimientos (calendario con reloj). Las notificaciones solo usan la silueta. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M19,4h-1V2h-2v2H8V2H6v2H5C3.89,4 3,4.9 3,6v14c0,1.1 0.89,2 2,2h6.26c-0.5,-0.6 -0.9,-1.28 -1.18,-2H5V10h14v1.08c0.72,0.28 1.4,0.68 2,1.18V6C21,4.9 20.1,4 19,4zM16.5,13C14.01,13 12,15.01 12,17.5S14.01,22 16.5,22S21,19.99 21,17.5S18.99,13 16.5,13zM18.15,19.85L16,17.7V14.5h1v2.79l1.85,1.85L18.15,19.85z" />
+</vector>

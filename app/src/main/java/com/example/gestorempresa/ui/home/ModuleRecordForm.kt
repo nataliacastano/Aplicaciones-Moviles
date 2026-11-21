@@ -79,7 +79,7 @@ import java.time.LocalDate
                         }
                         EntryField(if (recordKind == "MEDICO") "Reconocimiento o certificado *" else if (recordKind == "DOCUMENTO") "Nombre del documento *" else "Nombre del curso *", title, { title = it }, !saving)
                         EntryField(if (recordKind == "DOCUMENTO") "Fecha de caducidad (opcional, AAAA-MM-DD)" else "Fecha de próxima revisión / vencimiento (AAAA-MM-DD) *", date, { date = it }, !saving)
-                        Text(if (recordKind == "MEDICO") "Guarda aquí el reconocimiento médico y su próxima fecha de revisión. No se adjunta el archivo médico en esta versión." else if (recordKind == "DOCUMENTO") "Puedes registrar el documento aunque no conozcas su fecha de caducidad. Se avisará 30 días antes si la indicas." else "Se avisará 30 días antes de la fecha indicada.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (recordKind == "MEDICO") "Guarda aquí el reconocimiento médico y su próxima fecha de revisión. El certificado en PDF se puede adjuntar desde la ficha del trabajador, en Documentación." else if (recordKind == "DOCUMENTO") "Puedes registrar el documento aunque no conozcas su fecha de caducidad. Se avisará 30 días antes si la indicas." else "Se avisará 30 días antes de la fecha indicada.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 "task-new" -> {

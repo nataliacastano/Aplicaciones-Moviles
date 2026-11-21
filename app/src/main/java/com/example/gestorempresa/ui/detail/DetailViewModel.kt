@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import com.example.gestorempresa.ui.home.CatalogKind
 import com.example.gestorempresa.ui.home.CatalogSelection
 import com.example.gestorempresa.ui.home.HomeWorkspaceState
+import com.example.gestorempresa.ui.advanced.stats.projectCosts
 
 data class DetailField(val label: String, val value: String, val related: CatalogSelection? = null)
 data class DetailSection(val title: String, val fields: List<DetailField>)
@@ -66,6 +67,10 @@ class DetailViewModel(selection: CatalogSelection, state: HomeWorkspaceState) : 
         val hours = state.hours.filter { it.unidadTrabajoId == id }.sortedByDescending { it.fecha }
         val assignments = state.assignments.filter { it.projectId == id }
         val movements = state.movements.filter { it.projectId == id }
+        val costs = state.projectCosts(id)
+        val suppliers = state.materialUses.filter { it.unidadTrabajoId == id }
+            .mapNotNull { use -> state.materials.firstOrNull { it.id == use.materialId }?.proveedorId }.distinct()
+            .mapNotNull { supplierId -> state.suppliers.firstOrNull { it.id == supplierId } }
         return DetailContent(project.titulo, "${project.tipo} · ${project.estado}", listOf(
             DetailSection("Datos del servicio", listOf(DetailField("Cliente", project.clienteNombre.ifBlank { "Sin cliente asociado" }), DetailField("Ubicación", project.direccionUbicacion),
                 DetailField("Fecha de inicio", project.fechaInicio), DetailField("Finalización prevista", project.fechaFin ?: "Sin fecha prevista"),
@@ -78,7 +83,14 @@ class DetailViewModel(selection: CatalogSelection, state: HomeWorkspaceState) : 
             DetailSection("Movimientos económicos", movements.map { m -> DetailField(m.date,
                 "${m.concept} · ${if (m.income) "Ingreso" else "Gasto"} · ${"%.2f".format(m.amountCents / 100.0)} €") }
                 .ifEmpty { listOf(DetailField("Movimientos", "No hay ingresos o gastos registrados")) }),
-            DetailSection("Costes", listOf(DetailField("Personal", "${"%.2f".format(hours.sumOf { it.horasTrabajadas * it.costeHoraAplicado })} €"),
+            DetailSection("Proveedores relacionados", suppliers.map { DetailField(it.nombreEmpresa, it.personaContacto.ifBlank { it.telefono },
+                CatalogSelection(CatalogKind.SUPPLIERS, it.id)) }.ifEmpty { listOf(DetailField("Proveedores", "Sin materiales registrados")) }),
+            DetailSection("Costes", listOf(DetailField("Personal", "${"%.2f".format(costs.personnel)} €"),
+                DetailField("Materiales", "${"%.2f".format(costs.materials)} €"),
+                DetailField("Otros gastos", "${"%.2f".format(costs.otherExpenses)} €"),
+                DetailField("Coste total", "${"%.2f".format(costs.total)} €"),
+                DetailField("Ingresos", "${"%.2f".format(costs.income)} €"),
+                DetailField("Resultado (ingresos − coste total)", "${"%.2f".format(costs.result)} €"),
                 DetailField("Saldo de movimientos", "${"%.2f".format(movements.sumOf { if (it.income) it.amountCents else -it.amountCents } / 100.0)} €")))
         ))
     }

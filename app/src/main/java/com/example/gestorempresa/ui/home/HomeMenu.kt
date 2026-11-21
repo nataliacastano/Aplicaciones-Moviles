@@ -4,6 +4,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBox
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.DateRange
+import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.automirrored.outlined.List
@@ -11,6 +13,11 @@ import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.unit.dp
 import com.example.gestorempresa.ui.navigation.OpcionMenu
 
 /**
@@ -29,8 +36,23 @@ fun homeMenuOptions(avisos: Int = 0, avisosUrgentes: Boolean = false): List<Opci
     OpcionMenu("obligations", "Avisos", Icons.Outlined.Notifications, contador = avisos, urgente = avisosUrgentes, separadorAntes = true),
     OpcionMenu("tasks", "Tareas", Icons.Outlined.CheckCircle),
     OpcionMenu("assignments", "Zonas laborales", Icons.Outlined.LocationOn),
-    OpcionMenu("messaging", "Mensajería", Icons.Outlined.Email)
+    OpcionMenu("messaging", "Mensajería", Icons.Outlined.Email),
+    // Funciones avanzadas
+    OpcionMenu("map", "Mapa de obras", Icons.Outlined.Place, separadorAntes = true),
+    OpcionMenu("stats", "Estadísticas", BarChartIcon),
+    OpcionMenu("calendar", "Calendario", Icons.Outlined.DateRange)
 )
+
+/** Icono de gráfico de barras (no está en el paquete básico de iconos de Material). */
+val BarChartIcon: ImageVector by lazy {
+    ImageVector.Builder("BarChart", 24.dp, 24.dp, 24f, 24f).apply {
+        path(fill = SolidColor(Color.Black)) {
+            moveTo(5f, 9.2f); horizontalLineToRelative(3f); verticalLineTo(19f); horizontalLineTo(5f); close()
+            moveTo(10.6f, 5f); horizontalLineToRelative(2.8f); verticalLineToRelative(14f); horizontalLineToRelative(-2.8f); close()
+            moveTo(16.2f, 13f); horizontalLineTo(19f); verticalLineToRelative(6f); horizontalLineToRelative(-2.8f); close()
+        }
+    }.build()
+}
 
 /** Título que se muestra en la barra superior para la sección actual. */
 fun homeMenuTitle(destination: String): String =
