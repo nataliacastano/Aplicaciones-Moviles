@@ -4,18 +4,35 @@ import com.example.gestorempresa.ui.home.HomeWorkspaceState
 import java.time.LocalDate
 import java.time.YearMonth
 
-/** Costes e ingresos de un servicio o proyecto. */
+/** Categorías de gasto que ya se calculan a partir de horas y materiales usados. */
+val costCategoriesFromRecords = setOf("PERSONAL", "MATERIALES")
+
+/**
+ * Economía de un servicio o proyecto. Hay dos lecturas distintas que NO se mezclan:
+ * - Resultado real: ingresos − gastos registrados (lo que se ha cobrado y pagado).
+ * - Coste estimado: horas × tarifa + materiales usados + otros gastos. Los gastos registrados de
+ *   las categorías PERSONAL y MATERIALES no se suman otra vez porque ya están en horas y materiales.
+ */
 data class ProjectCosts(
     val projectId: Long,
     val title: String,
+    /** Coste de las horas registradas (horas × tarifa). */
     val personnel: Double,
+    /** Coste de los materiales usados (cantidad × precio de ese día). */
     val materials: Double,
+    /** Gastos registrados que no son de personal ni de materiales (transporte, suministros…). */
     val otherExpenses: Double,
     val income: Double,
-    val hours: Double
+    val hours: Double,
+    /** Todos los gastos registrados, de cualquier categoría. */
+    val registeredExpenses: Double = otherExpenses
 ) {
+    /** Coste estimado del servicio. */
     val total: Double get() = personnel + materials + otherExpenses
-    val result: Double get() = income - total
+    /** Resultado real: ingresos − gastos registrados. */
+    val result: Double get() = income - registeredExpenses
+    /** Margen estimado: ingresos − coste estimado. */
+    val estimatedMargin: Double get() = income - total
 }
 
 /** Valores de un mes para los gráficos de evolución. */
@@ -24,22 +41,28 @@ data class MonthValues(
     val hours: Double = 0.0,
     val personnel: Double = 0.0,
     val materials: Double = 0.0,
+    /** Gastos registrados (todas las categorías). */
     val expenses: Double = 0.0,
     val income: Double = 0.0
-)
+) {
+    /** Resultado real del mes: ingresos − gastos registrados (igual que el balance de Inicio). */
+    val result: Double get() = income - expenses
+}
 
 /** Coste de personal (horas × tarifa), materiales consumidos, gastos registrados e ingresos del proyecto. */
 fun HomeWorkspaceState.projectCosts(projectId: Long): ProjectCosts {
     val hoursOf = hours.filter { it.unidadTrabajoId == projectId }
     val moves = movements.filter { it.projectId == projectId }
+    val expenses = moves.filter { !it.income }
     return ProjectCosts(
         projectId = projectId,
         title = projects.firstOrNull { it.id == projectId }?.titulo ?: "Servicio",
         personnel = hoursOf.sumOf { it.horasTrabajadas * it.costeHoraAplicado },
         materials = materialUses.filter { it.unidadTrabajoId == projectId }.sumOf { it.cantidad * it.precioUnitarioAplicado },
-        otherExpenses = moves.filter { !it.income }.sumOf { it.amountCents } / 100.0,
+        otherExpenses = expenses.filter { it.category !in costCategoriesFromRecords }.sumOf { it.amountCents } / 100.0,
         income = moves.filter { it.income }.sumOf { it.amountCents } / 100.0,
-        hours = hoursOf.sumOf { it.horasTrabajadas }
+        hours = hoursOf.sumOf { it.horasTrabajadas },
+        registeredExpenses = expenses.sumOf { it.amountCents } / 100.0
     )
 }
 

@@ -25,7 +25,15 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
 import com.example.gestorempresa.data.media.AttachmentStorage
 import com.example.gestorempresa.data.media.decodePhotoBitmap
@@ -96,15 +104,48 @@ fun rememberPhotoPicker(storage: AttachmentStorage, multiple: Boolean = false, o
 /** Imagen guardada en el móvil, cargada en segundo plano y reducida al tamaño necesario. */
 @Composable
 fun LocalImage(path: String?, contentDescription: String?, modifier: Modifier = Modifier,
-    contentScale: ContentScale = ContentScale.Crop, maxSide: Int = 720, onClick: (() -> Unit)? = null) {
-    val image by produceState<ImageBitmap?>(null, path, maxSide) {
-        value = path?.let { withContext(Dispatchers.IO) { decodeImage(it, maxSide) } }
+    contentScale: ContentScale = ContentScale.Crop, maxSide: Int = 720, onClick: (() -> Unit)? = null,
+    placeholder: @Composable () -> Unit = { ImagePlaceholder() }) {
+    // retry cambia al pulsar «Reintentar» y vuelve a leer el archivo.
+    var retry by remember(path) { mutableIntStateOf(0) }
+    val result by produceState<ImageLoad>(ImageLoad.Loading, path, maxSide, retry) {
+        value = when {
+            path == null -> ImageLoad.Empty
+            else -> withContext(Dispatchers.IO) { decodeImage(path, maxSide) }?.let { ImageLoad.Ready(it) } ?: ImageLoad.Failed
+        }
     }
     val clickable = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
     Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant).then(clickable), contentAlignment = Alignment.Center) {
-        val current = image
-        if (current != null) Image(current, contentDescription, Modifier.fillMaxSize(), contentScale = contentScale)
-        else if (path != null) CircularProgressIndicator()
+        when (val current = result) {
+            is ImageLoad.Ready -> Image(current.image, contentDescription, Modifier.fillMaxSize(), contentScale = contentScale)
+            ImageLoad.Loading -> CircularProgressIndicator()
+            ImageLoad.Empty -> placeholder()
+            ImageLoad.Failed -> Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(4.dp)) {
+                Text("⚠️", style = MaterialTheme.typography.titleMedium)
+                Text("No se pudo cargar", style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.error)
+                TextButton(onClick = { retry++ }, contentPadding = PaddingValues(horizontal = 4.dp)) {
+                    Text("Reintentar", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+    }
+}
+
+/** Estado de carga de una imagen local. */
+private sealed interface ImageLoad {
+    data object Loading : ImageLoad
+    data object Empty : ImageLoad
+    data object Failed : ImageLoad
+    data class Ready(val image: ImageBitmap) : ImageLoad
+}
+
+/** Imagen predeterminada cuando todavía no hay foto. */
+@Composable
+fun ImagePlaceholder(label: String = "Sin foto") {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text("🖼️", style = MaterialTheme.typography.titleLarge)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

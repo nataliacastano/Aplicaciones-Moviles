@@ -22,7 +22,7 @@ fun UnidadTrabajoEntity.toPin(): MapPin? = if (latitud != null && longitud != nu
     MapPin(id, titulo, listOf(clienteNombre, direccionUbicacion, estado).filter { it.isNotBlank() }.joinToString(" · "), latitud, longitud) else null
 
 /**
- * Mapa con la ubicación de todas las obras, servicios y proyectos (y, por tanto, de sus clientes).
+ * Mapa con la ubicación de todos los servicios y proyectos (y, por tanto, de sus clientes). Válido para cualquier sector.
  * Se puede filtrar por estado; al tocar dos veces un punto se abre su ficha.
  */
 @Composable
@@ -33,7 +33,7 @@ fun ProjectsMapScreen(state: HomeWorkspaceState, onOpenProject: (Long) -> Unit, 
     val missing = visible.filter { it.latitud == null || it.longitud == null }
     Column(modifier.fillMaxSize().testTag("map-screen")) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Mapa de obras y servicios", style = MaterialTheme.typography.headlineSmall)
+            Text("Mapa de servicios y proyectos", style = MaterialTheme.typography.headlineSmall)
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(listOf("TODOS" to "Todos", "ACTIVO" to "Activos", "PAUSADO" to "Pausados", "FINALIZADO" to "Finalizados")) { (code, label) ->
                     FilterChip(selected = status == code, onClick = { status = code }, label = { Text(label) })
@@ -57,50 +57,19 @@ fun ProjectsMapScreen(state: HomeWorkspaceState, onOpenProject: (Long) -> Unit, 
 }
 
 /**
- * Pantalla para fijar la ubicación de un servicio o proyecto:
- * busca la dirección con el geocodificador o toca el punto exacto en el mapa.
+ * Pantalla para fijar la ubicación de un servicio o proyecto. Guarda a la vez la dirección y las
+ * coordenadas para que no se contradigan (ver [LocationPickerContent]).
  */
 @Composable
 fun LocationPickerScreen(project: UnidadTrabajoEntity, workspace: HomeWorkspaceViewModel, onBack: () -> Unit) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val saving by workspace.saving.collectAsState()
-    var latitude by rememberSaveable { mutableStateOf(project.latitud) }
-    var longitude by rememberSaveable { mutableStateOf(project.longitud) }
-    var query by rememberSaveable { mutableStateOf(project.direccionUbicacion) }
-    var searching by remember { mutableStateOf(false) }
-    var message by remember { mutableStateOf<String?>(null) }
-    var focus by remember { mutableIntStateOf(0) }
-    val pin = if (latitude != null && longitude != null) listOf(MapPin(project.id, project.titulo, query, latitude!!, longitude!!)) else emptyList()
-
-    Column(Modifier.fillMaxSize()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = onBack, enabled = !saving) { Text("Volver") }
-            Text("Ubicación de ${project.titulo}", style = MaterialTheme.typography.titleLarge)
-            OutlinedTextField(query, { query = it }, label = { Text("Dirección") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(enabled = !searching && query.isNotBlank(), onClick = {
-                    searching = true; message = null
-                    scope.launch {
-                        val found = geocode(context, query)
-                        searching = false
-                        if (found == null) message = "No se ha encontrado la dirección. Toca el punto en el mapa."
-                        else { latitude = found.first; longitude = found.second; focus++ }
-                    }
-                }) { Text(if (searching) "Buscando…" else "🔎 Buscar dirección") }
-                Button(enabled = !saving && pin.isNotEmpty(), onClick = {
-                    workspace.save({ setProjectLocation(project.id, latitude, longitude) }, onBack)
-                }) { Text("Guardar") }
-            }
-            Text(message ?: if (pin.isEmpty()) "Toca el mapa para marcar la ubicación." else "%.5f, %.5f · toca el mapa para corregirla.".format(latitude, longitude),
-                style = MaterialTheme.typography.bodySmall,
-                color = if (message != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
-            if (project.latitud != null) TextButton(enabled = !saving, onClick = {
-                workspace.save({ setProjectLocation(project.id, null, null) }, onBack)
-            }) { Text("Quitar ubicación del mapa") }
-        }
-        OsmMap(pin, Modifier.weight(1f).fillMaxWidth(), onTap = { lat, lon -> latitude = lat; longitude = lon }, focusKey = focus)
-    }
+    val initialPoint = if (project.latitud != null && project.longitud != null) project.latitud to project.longitud else null
+    LocationPickerContent(title = "Ubicación de ${project.titulo}", initialAddress = project.direccionUbicacion,
+        initialPoint = initialPoint, saving = saving, onCancel = onBack,
+        onConfirm = { location ->
+            workspace.save({ setProjectAddressAndLocation(project.id, location.address, location.latitude, location.longitude) }, onBack)
+        },
+        onRemove = if (initialPoint != null) { { workspace.save({ setProjectLocation(project.id, null, null) }, onBack) } } else null)
 }
 
 /** Vista previa del mapa dentro de la ficha de un servicio o proyecto. */

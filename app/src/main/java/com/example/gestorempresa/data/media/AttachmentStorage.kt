@@ -51,8 +51,11 @@ class AttachmentStorage(context: Context, companyId: Long) {
         val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime)
             ?: name.substringAfterLast('.', "").ifBlank { "bin" }
         val target = newFile(prefix, extension)
-        val input = resolver.openInputStream(uri) ?: error("No se ha podido abrir el archivo seleccionado")
-        input.use { source -> target.outputStream().use { source.copyTo(it) } }
+        // Si la copia falla a medias se borra el archivo parcial para no dejar restos.
+        try {
+            val input = resolver.openInputStream(uri) ?: error("No se ha podido abrir el archivo seleccionado")
+            input.use { source -> target.outputStream().use { source.copyTo(it) } }
+        } catch (e: Exception) { target.delete(); throw e }
         StoredFile(target.absolutePath, name.substringBeforeLast('.').ifBlank { name }, mime)
     }
 
@@ -70,6 +73,19 @@ class AttachmentStorage(context: Context, companyId: Long) {
     suspend fun delete(path: String?) = withContext(Dispatchers.IO) {
         val file = path?.let(::File) ?: return@withContext
         if (file.canonicalPath.startsWith(folder.canonicalPath + File.separator)) file.delete()
+    }
+
+    companion object {
+        /**
+         * Borra fotos temporales (cámara y ajuste) de más de un día. Quedan si Android cierra la app
+         * a mitad de una captura, y pueden contener imágenes personales.
+         */
+        suspend fun cleanTemporaryFiles(context: Context, maxAgeMillis: Long = 24L * 60 * 60 * 1000) = withContext(Dispatchers.IO) {
+            val limit = System.currentTimeMillis() - maxAgeMillis
+            listOf("camara", "ajuste_fotos").forEach { name ->
+                File(context.cacheDir, name).listFiles()?.filter { it.isFile && it.lastModified() < limit }?.forEach { it.delete() }
+            }
+        }
     }
 
     private fun newFile(prefix: String, extension: String): File {

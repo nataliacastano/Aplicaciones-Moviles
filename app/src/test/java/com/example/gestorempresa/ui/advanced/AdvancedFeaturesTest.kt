@@ -10,6 +10,8 @@ import com.example.gestorempresa.ui.advanced.communication.*
 import com.example.gestorempresa.ui.advanced.dates.DueKind
 import com.example.gestorempresa.ui.advanced.dates.DueStatus
 import com.example.gestorempresa.ui.advanced.dates.dueItems
+import com.example.gestorempresa.ui.advanced.dates.dueOverview
+import com.example.gestorempresa.ui.advanced.dates.contactFor
 import com.example.gestorempresa.ui.advanced.dates.pendingWarnings
 import com.example.gestorempresa.ui.advanced.stats.monthlyValues
 import com.example.gestorempresa.ui.advanced.stats.projectCosts
@@ -75,7 +77,9 @@ class AdvancedFeaturesTest {
         assertEquals(55.0, costs.materials, 0.001)
         assertEquals(50.0, costs.otherExpenses, 0.001)
         assertEquals(2000.0, costs.income, 0.001)
-        assertEquals(2000.0 - (160.0 + 55.0 + 50.0), costs.result, 0.001)
+        // Resultado real = ingresos − gastos registrados; las horas y materiales son una estimación aparte.
+        assertEquals(2000.0 - 50.0, costs.result, 0.001)
+        assertEquals(2000.0 - (160.0 + 55.0 + 50.0), costs.estimatedMargin, 0.001)
     }
 
     @Test fun groupsValuesByMonthAndWorkersByTrade() {
@@ -93,7 +97,7 @@ class AdvancedFeaturesTest {
         val items = state.dueItems()
         val contract = items.single { it.kind == DueKind.CONTRATO }
         assertEquals(CatalogSelection(CatalogKind.EMPLOYEES, 1), contract.target)
-        assertEquals(DueStatus.PROGRAMADO, contract.status(today, 7))
+        assertEquals(DueStatus.VIGENTE, contract.status(today, 7))
         assertEquals(DueStatus.PROXIMO, contract.status(today, 15))
         assertEquals(DueStatus.VENCIDO, items.single { it.title == "PRL 20h" }.status(today, 15))
         assertEquals(DueStatus.HECHO, items.single { it.kind == DueKind.INICIO }.status(today, 15))
@@ -119,5 +123,82 @@ class AdvancedFeaturesTest {
         val withPhoto = state.copy(employees = state.employees.map { if (it.id == 1L) it.copy(fotoUrl = "/foto.jpg") else it })
         assertEquals(listOf("/x.pdf", "/foto.jpg"), withPhoto.filesOwnedBy(CatalogSelection(CatalogKind.EMPLOYEES, 1)))
         assertTrue(withPhoto.filesOwnedBy(CatalogSelection(CatalogKind.EMPLOYEES, 2)).isEmpty())
+    }
+}
+
+class DueOverviewTest {
+    private val today = java.time.LocalDate.parse("2026-11-21")
+    private val state = HomeWorkspaceState(obligations = listOf(
+        HomeObligation(1, "MEDICO", "Vence hoy", "EMPLEADO", 1, "2026-11-21"),
+        HomeObligation(2, "CURSO", "Vencido ayer", "EMPLEADO", 1, "2026-11-20"),
+        HomeObligation(3, "CURSO", "Dentro de un año", "EMPLEADO", 1, "2027-11-21"),
+        HomeObligation(4, "DOCUMENTO", "Sin fecha", "EMPLEADO", 1),
+        HomeObligation(5, "MEDICO", "Atendido", "EMPLEADO", 1, "2026-11-01", resolved = true)),
+        tasks = listOf(HomeTask(1, "Tarea vencida", 1, "2026-11-01")))
+
+    @Test fun separatesValidUpcomingAndExpiredWithoutTasks() {
+        val overview = state.dueOverview(today, warnDays = 15)
+        assertEquals(listOf("Vencido ayer"), overview.expired.map { it.title })
+        assertEquals(listOf("Vence hoy"), overview.upcoming.map { it.title }) // hoy todavía es válido
+        assertEquals(listOf("Dentro de un año"), overview.valid.map { it.title })
+        assertEquals(1, overview.pendingWithoutDate)
+        assertEquals(3, overview.bellCount) // vencido + próximo + documentación sin fecha
+        assertTrue(overview.hasUrgent)
+    }
+
+    @Test fun scheduledDatesAreNotCalledValid() {
+        val task = state.dueItems().single { it.kind == DueKind.TAREA }
+        assertEquals(DueStatus.VENCIDO, task.status(today, 15))
+        val future = state.copy(tasks = listOf(HomeTask(2, "Futura", 1, "2027-01-01"))).dueItems().single { it.kind == DueKind.TAREA }
+        assertEquals(DueStatus.PROGRAMADO, future.status(today, 15))
+    }
+}
+
+class NotifyNowTest {
+    private val today = java.time.LocalDate.parse("2026-11-21")
+    private val employee = EmpleadoEntity(id = 7, nombre = "Juan", apellidos = "Pérez", dni = "", telefono = "600111222", email = "j@example.com",
+        oficio = "Albañil", tipoEmpleado = "COMPLETO", salarioBase = 0.0, lugarResidencia = "", direccionPersonal = "")
+    private val state = HomeWorkspaceState(employees = listOf(employee), obligations = listOf(
+        HomeObligation(1, "CURSO", "PRL 20h", "EMPLEADO", 7, "2026-11-25"),
+        HomeObligation(2, "MEDICO", "Revisión anual", "EMPLEADO", 7, "2026-11-20")))
+
+    @Test fun preparesAMessageForTheAffectedWorker() {
+        val items = state.dueItems()
+        val course = items.single { it.title == "PRL 20h" }
+        assertEquals("Juan Pérez", state.contactFor(course)?.name)
+        assertEquals("Curso próximo a caducar" to mapOf("CURSO" to "PRL 20h", "FECHA" to "2026-11-25"),
+            com.example.gestorempresa.ui.advanced.dates.dueMessagePreset(course))
+        assertEquals("Reconocimiento médico", com.example.gestorempresa.ui.advanced.dates.dueMessagePreset(items.single { it.title == "Revisión anual" }).first)
+    }
+
+    @Test fun previewTextIsTheSameAsTheNotification() {
+        val items = state.pendingWarnings(today, 15, includeExpiries = true, includeTasks = true)
+        val content = com.example.gestorempresa.ui.advanced.dates.DueDateNotifications.content(items, today, 15)
+        assertEquals("1 vencido · 1 próximo", content.title)
+        assertEquals(listOf("2026-11-20 · Revisión anual (Juan Pérez)", "2026-11-25 · PRL 20h (Juan Pérez)"), content.lines)
+        assertTrue(state.pendingWarnings(today, 15, includeExpiries = false, includeTasks = false).isEmpty())
+    }
+}
+
+class EconomyTest {
+    private val project = UnidadTrabajoEntity(id = 1, titulo = "Limpieza", tipo = "SERVICIO", clienteNombre = "", direccionUbicacion = "", fechaInicio = "2026-11-01")
+
+    @Test fun payrollAndMaterialExpensesAreNotCountedTwice() {
+        val state = HomeWorkspaceState(projects = listOf(project),
+            hours = listOf(RegistroHorasEntity(unidadTrabajoId = 1, empleadoId = 1, fecha = "2026-11-03", horasTrabajadas = 10.0, costeHoraAplicado = 15.0)),
+            materialUses = listOf(ConsumoMaterialEntity(unidadTrabajoId = 1, materialId = 1, cantidad = 2.0, precioUnitarioAplicado = 10.0, fecha = "2026-11-03")),
+            movements = listOf(
+                HomeMovement(projectId = 1, concept = "Cuota", amountCents = 100_000, income = true, date = "2026-11-15", category = "INGRESO"),
+                HomeMovement(projectId = 1, concept = "Nómina", amountCents = 15_000, income = false, date = "2026-11-30", category = "PERSONAL"),
+                HomeMovement(projectId = 1, concept = "Gasolina", amountCents = 3_000, income = false, date = "2026-11-10", category = "TRANSPORTE")))
+        val costs = state.projectCosts(1)
+        assertEquals(150.0, costs.personnel, 0.001)
+        assertEquals(30.0, costs.otherExpenses, 0.001) // la nómina no se suma otra vez
+        assertEquals(180.0, costs.registeredExpenses, 0.001)
+        assertEquals(820.0, costs.result, 0.001) // 1000 − 180: positivo
+        val month = state.monthlyValues(1, java.time.LocalDate.parse("2026-11-21")).single()
+        assertEquals(1000.0, month.income, 0.001)
+        assertEquals(180.0, month.expenses, 0.001)
+        assertEquals(820.0, month.result, 0.001)
     }
 }

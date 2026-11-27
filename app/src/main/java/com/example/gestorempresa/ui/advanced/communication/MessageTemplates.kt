@@ -18,8 +18,8 @@ val messageTemplates = listOf(
     MessageTemplate("Asignación a un servicio", "Hola [NOMBRE], has sido asignado al servicio [SERVICIO] el día [FECHA]."),
     MessageTemplate("Reconocimiento médico", "Hola [NOMBRE], tu reconocimiento médico está próximo a caducar ([FECHA]). Por favor, pide cita lo antes posible."),
     MessageTemplate("Curso próximo a caducar", "Hola [NOMBRE], tu curso [CURSO] caduca el [FECHA]. Avísanos para organizar la renovación."),
-    MessageTemplate("Documentación pendiente", "Hola [NOMBRE], necesitamos que nos entregues la siguiente documentación: [DOCUMENTO]."),
-    MessageTemplate("Cambio de horario", "Hola [NOMBRE], a partir del [FECHA] tu horario será [HORARIO]. ¿Puedes confirmarlo?"),
+    MessageTemplate("Documentación pendiente", "Hola [NOMBRE], necesitamos que nos entregues este documento: [DOCUMENTO]."),
+    MessageTemplate("Cambio de horario", "Hola [NOMBRE], a partir del [FECHA] tu horario será de [HORA_INICIO] a [HORA_FIN]. ¿Puedes confirmarlo?"),
     MessageTemplate(CUSTOM_TEMPLATE, "")
 )
 
@@ -51,32 +51,17 @@ fun whatsappNumber(phone: String): String? {
     return digits.takeIf { it.length in 10..15 }
 }
 
-/** Abre WhatsApp, el correo o ambos con el mensaje ya escrito; el administrador solo tiene que pulsar enviar. */
+/**
+ * Abre WhatsApp o el correo con el mensaje ya escrito; el administrador solo tiene que pulsar enviar.
+ * «WhatsApp + Email» NO se abre aquí: lanzar dos apps a la vez (startActivities) dejaba la segunda
+ * oculta o perdida, porque WhatsApp y Gmail se abren en su propia tarea. Se usa [SendProgress], que
+ * abre un canal y continúa con el siguiente cuando el usuario vuelve.
+ */
 fun sendMessage(context: Context, channel: Channel, phone: String, email: String, subject: String, message: String): Boolean {
-    val whatsapp = whatsappNumber(phone)?.let { number ->
-        Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$number?text=${Uri.encode(message)}"))
-    }
-    val mail = email.trim().takeIf { it.isNotBlank() }?.let { address ->
-        Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:")).putExtra(Intent.EXTRA_EMAIL, arrayOf(address))
-            .putExtra(Intent.EXTRA_SUBJECT, subject).putExtra(Intent.EXTRA_TEXT, message)
-    }
-    val intents = when (channel) {
-        Channel.WHATSAPP -> listOfNotNull(whatsapp)
-        Channel.EMAIL -> listOfNotNull(mail)
-        // Se abre primero WhatsApp; al volver atrás aparece el correo ya preparado.
-        Channel.BOTH -> listOfNotNull(mail, whatsapp)
-    }
-    if (intents.isEmpty()) {
-        Toast.makeText(context, if (channel == Channel.EMAIL) "Este contacto no tiene correo" else "El teléfono no es válido para WhatsApp", Toast.LENGTH_SHORT).show()
-        return false
-    }
-    return try {
-        if (intents.size == 1) context.startActivity(intents.first()) else context.startActivities(intents.toTypedArray())
-        true
-    } catch (_: ActivityNotFoundException) {
-        Toast.makeText(context, "No hay ninguna app para enviar el mensaje", Toast.LENGTH_SHORT).show()
-        false
-    }
+    require(channel != Channel.BOTH) { "Usa SendProgress para enviar por WhatsApp y Email" }
+    val problem = openChannel(context, channel, phone, email, subject, message)
+    if (problem != null) Toast.makeText(context, problem, Toast.LENGTH_SHORT).show()
+    return problem == null
 }
 
 /** Llamada de teléfono (abre el marcador; no llama sin que el usuario lo confirme). */

@@ -32,6 +32,7 @@ private val monthNames = listOf("Enero", "Febrero", "Marzo", "Abril", "Mayo", "J
 fun statusColor(status: DueStatus): Color = when (status) {
     DueStatus.VENCIDO -> MaterialTheme.colorScheme.error
     DueStatus.PROXIMO -> Color(0xFFF59E0B)
+    DueStatus.VIGENTE -> Color(0xFF10B981)
     DueStatus.PROGRAMADO -> MaterialTheme.colorScheme.primary
     DueStatus.HECHO -> MaterialTheme.colorScheme.outline
 }
@@ -42,17 +43,24 @@ fun statusColor(status: DueStatus): Color = when (status) {
  */
 @Composable
 fun CalendarScreen(state: HomeWorkspaceState, warnDays: Int, onOpen: (CatalogSelection) -> Unit, onNotifyNow: () -> Unit,
+    templates: com.example.gestorempresa.ui.advanced.communication.MessageTemplateStore, includeExpiries: Boolean = true, includeTasks: Boolean = true,
     modifier: Modifier = Modifier, today: LocalDate = LocalDate.now()) {
+    var reviewingNotice by remember { mutableStateOf(false) }
+    if (reviewingNotice) NotifyNowDialog(state, today, warnDays, includeExpiries, includeTasks, templates,
+        onConfirm = { reviewingNotice = false; onNotifyNow() }, onDismiss = { reviewingNotice = false })
     val all = remember(state) { state.dueItems() }
     var monthText by rememberSaveable { mutableStateOf(YearMonth.from(today).toString()) }
     val month = YearMonth.parse(monthText)
     var selectedDay by rememberSaveable { mutableStateOf<String?>(null) }
     var filter by rememberSaveable { mutableStateOf("MES") }
-    val overdue = all.filter { it.status(today, warnDays) == DueStatus.VENCIDO }
-    val upcoming = all.filter { it.status(today, warnDays) == DueStatus.PROXIMO }
+    // Mismo cálculo que la campana de Inicio y las notificaciones (dueOverview).
+    val overview = remember(state, warnDays, today) { state.dueOverview(today, warnDays) }
+    val planning = all.filter { !it.kind.isExpiry && it.status(today, warnDays) != DueStatus.HECHO }
     val shown = when (filter) {
-        "VENCIDOS" -> overdue
-        "PROXIMOS" -> upcoming
+        "VENCIDOS" -> overview.expired
+        "PROXIMOS" -> overview.upcoming
+        "VIGENTES" -> overview.valid
+        "PLANIFICACION" -> planning
         else -> selectedDay?.let { day -> all.filter { it.date.toString() == day } } ?: all.filter { YearMonth.from(it.date) == month }
     }
 
@@ -60,14 +68,17 @@ fun CalendarScreen(state: HomeWorkspaceState, warnDays: Int, onOpen: (CatalogSel
         item {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("Fechas y vencimientos", style = MaterialTheme.typography.headlineMedium)
-                Text("Se considera «próximo» lo que vence en los próximos $warnDays días (puedes cambiarlo en Ajustes).",
+                Text("Vencimientos de reconocimientos, cursos, contratos y documentos. «Próximo» es lo que vence en los próximos $warnDays días " +
+                    "(se cambia en Ajustes); lo que vence hoy aún es válido hoy." +
+                    (if (overview.pendingWithoutDate > 0) " Documentos pendientes sin fecha: ${overview.pendingWithoutDate}." else ""),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                CounterTile("Vencidos", overdue.size, MaterialTheme.colorScheme.error, Modifier.weight(1f)) { filter = "VENCIDOS" }
-                CounterTile("Próximos", upcoming.size, Color(0xFFF59E0B), Modifier.weight(1f)) { filter = "PROXIMOS" }
+                CounterTile("Vencidos", overview.expired.size, MaterialTheme.colorScheme.error, Modifier.weight(1f)) { filter = "VENCIDOS" }
+                CounterTile("Próximos", overview.upcoming.size, Color(0xFFF59E0B), Modifier.weight(1f)) { filter = "PROXIMOS" }
+                CounterTile("Vigentes", overview.valid.size, Color(0xFF10B981), Modifier.weight(1f)) { filter = "VIGENTES" }
             }
         }
         item {
@@ -88,7 +99,8 @@ fun CalendarScreen(state: HomeWorkspaceState, warnDays: Int, onOpen: (CatalogSel
         }
         item {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(listOf("MES" to (selectedDay?.let { "Día $it" } ?: "Este mes"), "VENCIDOS" to "Vencidos", "PROXIMOS" to "Próximos")) { (code, label) ->
+                items(listOf("MES" to (selectedDay?.let { "Día $it" } ?: "Este mes"), "VENCIDOS" to "Vencidos", "PROXIMOS" to "Próximos",
+                    "VIGENTES" to "Vigentes", "PLANIFICACION" to "Tareas y proyectos")) { (code, label) ->
                     FilterChip(selected = filter == code, onClick = { filter = code }, label = { Text(label) })
                 }
             }
@@ -99,7 +111,7 @@ fun CalendarScreen(state: HomeWorkspaceState, warnDays: Int, onOpen: (CatalogSel
             DueRow(item, item.status(today, warnDays)) { item.target?.let(onOpen) }
         }
         item {
-            OutlinedButton(onClick = onNotifyNow, modifier = Modifier.fillMaxWidth()) { Text("🔔 Enviar ahora el aviso de vencimientos") }
+            OutlinedButton(onClick = { reviewingNotice = true }, modifier = Modifier.fillMaxWidth()) { Text("🔔 Revisar el aviso de vencimientos") }
         }
     }
 }

@@ -17,7 +17,12 @@ enum class DueKind(val label: String, val isExpiry: Boolean) {
     TAREA("Tarea programada", false)
 }
 
-enum class DueStatus(val label: String) { VENCIDO("Vencido"), PROXIMO("Próximo"), PROGRAMADO("Programado"), HECHO("Completado") }
+/**
+ * Estado de una fecha. Los vencimientos (médicos, cursos, documentos, contratos) son VIGENTE,
+ * PROXIMO o VENCIDO; las fechas programadas (tareas, inicio y fin de proyectos) son PROGRAMADO,
+ * PROXIMO o VENCIDO. Lo que vence HOY todavía es válido hoy: cuenta como próximo, no como vencido.
+ */
+enum class DueStatus(val label: String) { VENCIDO("Vencido"), PROXIMO("Próximo a vencer"), VIGENTE("Vigente"), PROGRAMADO("Programado"), HECHO("Completado") }
 
 /** Una fecha importante de la empresa. [target] es la ficha que se abre al tocarla, si la hay. */
 data class DueItem(
@@ -32,6 +37,7 @@ data class DueItem(
         done -> DueStatus.HECHO
         date < today -> if (kind == DueKind.INICIO) DueStatus.HECHO else DueStatus.VENCIDO
         date <= today.plusDays(warnDays.toLong()) -> DueStatus.PROXIMO
+        kind.isExpiry -> DueStatus.VIGENTE
         else -> DueStatus.PROGRAMADO
     }
 }
@@ -84,3 +90,28 @@ fun HomeWorkspaceState.pendingWarnings(today: LocalDate, warnDays: Int, includeE
         (status == DueStatus.VENCIDO || status == DueStatus.PROXIMO) &&
             ((item.kind.isExpiry && includeExpiries) || (!item.kind.isExpiry && item.kind != DueKind.INICIO && includeTasks))
     }
+
+/** Recuento de vencimientos para la campana 🔔 y el calendario de Inicio (miembro 2). */
+data class DueOverview(
+    val expired: List<DueItem>,
+    val upcoming: List<DueItem>,
+    val valid: List<DueItem>,
+    /** Documentación pendiente sin fecha: no vence, pero hay que entregarla. */
+    val pendingWithoutDate: Int
+) {
+    /** Lo que merece la atención del administrador: vencidos, próximos y documentación sin fecha. */
+    val bellCount: Int get() = expired.size + upcoming.size + pendingWithoutDate
+    val hasUrgent: Boolean get() = expired.isNotEmpty()
+}
+
+/**
+ * Resumen único de vencimientos con las mismas reglas que el calendario y las notificaciones,
+ * para que todos los contadores de la app coincidan. [warnDays] viene de Ajustes.
+ * Solo cuenta vencimientos (no tareas ni fechas de proyectos) y no incluye lo ya atendido.
+ */
+fun HomeWorkspaceState.dueOverview(today: LocalDate, warnDays: Int): DueOverview {
+    val expiries = dueItems().filter { it.kind.isExpiry }
+    fun with(status: DueStatus) = expiries.filter { it.status(today, warnDays) == status }
+    return DueOverview(with(DueStatus.VENCIDO), with(DueStatus.PROXIMO), with(DueStatus.VIGENTE),
+        obligations.count { !it.resolved && it.dueDate == null && it.kind == "DOCUMENTO" })
+}

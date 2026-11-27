@@ -73,11 +73,16 @@ fun AttachmentViewerScreen(file: HomeAttachment, ownerName: String, storage: Att
 
 /** Abre el archivo en otra app (visor de PDF, galería…) o lo comparte (WhatsApp, correo…). */
 fun openExternally(context: android.content.Context, storage: AttachmentStorage, file: HomeAttachment, share: Boolean) {
+    // Solo se concede permiso de LECTURA y solo a la app que elija el usuario, de forma temporal.
+    // El ClipData es necesario para que el permiso pase a través del selector «Compartir».
     val uri = storage.shareUri(file.path)
-    val intent = if (share) Intent.createChooser(Intent(Intent.ACTION_SEND).setType(file.mimeType)
-        .putExtra(Intent.EXTRA_STREAM, uri).putExtra(Intent.EXTRA_SUBJECT, file.name)
-        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), "Compartir ${file.name}")
-    else Intent(Intent.ACTION_VIEW).setDataAndType(uri, file.mimeType).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    val intent = if (share) {
+        val send = Intent(Intent.ACTION_SEND).setType(file.mimeType)
+            .putExtra(Intent.EXTRA_STREAM, uri).putExtra(Intent.EXTRA_SUBJECT, file.name)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        send.clipData = android.content.ClipData.newRawUri(file.name, uri)
+        Intent.createChooser(send, "Compartir ${file.name}").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    } else Intent(Intent.ACTION_VIEW).setDataAndType(uri, file.mimeType).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     try { context.startActivity(intent) } catch (_: ActivityNotFoundException) {
         Toast.makeText(context, "No hay ninguna app para abrir este archivo", Toast.LENGTH_SHORT).show()
     }

@@ -3,9 +3,7 @@ package com.example.gestorempresa.ui.advanced.map
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.location.Geocoder
 import android.net.Uri
-import android.os.Build
 import android.widget.Toast
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -15,9 +13,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withContext
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -28,8 +23,6 @@ import org.osmdroid.views.overlay.CopyrightOverlay
 import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import java.io.File
-import java.util.Locale
-import kotlin.coroutines.resume
 
 /** Punto que se dibuja en el mapa. */
 data class MapPin(val id: Long, val title: String, val snippet: String, val latitude: Double, val longitude: Double)
@@ -130,25 +123,6 @@ private fun configureOsmdroid(context: Context) {
     val base = File(context.cacheDir, "osmdroid")
     config.osmdroidBasePath = base
     config.osmdroidTileCache = File(base, "tiles")
-}
-
-/**
- * Busca las coordenadas de una dirección con el geocodificador del sistema.
- * Devuelve null si no se encuentra o si el dispositivo no tiene servicio de geocodificación.
- */
-suspend fun geocode(context: Context, address: String): Pair<Double, Double>? = withContext(Dispatchers.IO) {
-    if (address.isBlank() || !Geocoder.isPresent()) return@withContext null
-    val geocoder = Geocoder(context, Locale("es", "ES"))
-    try {
-        if (Build.VERSION.SDK_INT >= 33) suspendCancellableCoroutine { cont ->
-            geocoder.getFromLocationName(address, 1, object : Geocoder.GeocodeListener {
-                override fun onGeocode(results: MutableList<android.location.Address>) {
-                    cont.resume(results.firstOrNull()?.let { it.latitude to it.longitude })
-                }
-                override fun onError(errorMessage: String?) { cont.resume(null) }
-            })
-        } else @Suppress("DEPRECATION") geocoder.getFromLocationName(address, 1)?.firstOrNull()?.let { it.latitude to it.longitude }
-    } catch (_: Exception) { null }
 }
 
 /** Abre la ubicación en la app de mapas del móvil (Google Maps u otra) para ver la ruta. */

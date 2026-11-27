@@ -71,6 +71,18 @@ object DueDateNotifications {
     fun canNotify(context: Context): Boolean = NotificationManagerCompat.from(context).areNotificationsEnabled() &&
         (Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
 
+    /** Texto exacto de la notificación; la vista previa del calendario muestra lo mismo. */
+    data class Content(val title: String, val lines: List<String>, val more: String?)
+
+    fun content(items: List<DueItem>, today: LocalDate, warnDays: Int): Content {
+        val overdue = items.count { it.status(today, warnDays) == DueStatus.VENCIDO }
+        val title = when {
+            overdue > 0 -> "$overdue vencido${if (overdue > 1) "s" else ""} · ${items.size - overdue} próximo${if (items.size - overdue != 1) "s" else ""}"
+            else -> "${items.size} fecha${if (items.size > 1) "s" else ""} próxima${if (items.size > 1) "s" else ""} a vencer"
+        }
+        return Content(title, items.take(6).map { "${it.date} · ${it.title} (${it.detail})" }, if (items.size > 6) "y ${items.size - 6} más" else null)
+    }
+
     internal fun show(context: Context, items: List<DueItem>, today: LocalDate, warnDays: Int) {
         val manager = NotificationManagerCompat.from(context)
         if (items.isEmpty() || !canNotify(context)) { manager.cancel(NOTIFICATION_ID); return }
@@ -80,14 +92,11 @@ object DueDateNotifications {
                     description = "Reconocimientos médicos, cursos, contratos, documentos y tareas próximos a vencer"
                 })
         }
-        val overdue = items.count { it.status(today, warnDays) == DueStatus.VENCIDO }
-        val title = when {
-            overdue > 0 -> "$overdue vencido${if (overdue > 1) "s" else ""} · ${items.size - overdue} próximo${if (items.size - overdue != 1) "s" else ""}"
-            else -> "${items.size} fecha${if (items.size > 1) "s" else ""} próxima${if (items.size > 1) "s" else ""} a vencer"
-        }
+        val content = content(items, today, warnDays)
+        val title = content.title
         val style = NotificationCompat.InboxStyle().setBigContentTitle(title)
-        items.take(6).forEach { style.addLine("${it.date} · ${it.title} (${it.detail})") }
-        if (items.size > 6) style.setSummaryText("y ${items.size - 6} más")
+        content.lines.forEach { style.addLine(it) }
+        content.more?.let { style.setSummaryText(it) }
         val open = PendingIntent.getActivity(context, 0,
             Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
@@ -98,6 +107,10 @@ object DueDateNotifications {
             .setStyle(style)
             .setContentIntent(open)
             .setAutoCancel(true)
+            // En la pantalla de bloqueo no se muestran nombres ni documentos (datos personales).
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(NotificationCompat.Builder(context, CHANNEL_ID).setSmallIcon(R.drawable.ic_notification_due)
+                .setContentTitle("Vencimientos pendientes").setContentText("Desbloquea el móvil para ver los detalles").build())
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
         try { manager.notify(NOTIFICATION_ID, notification) } catch (_: SecurityException) { }

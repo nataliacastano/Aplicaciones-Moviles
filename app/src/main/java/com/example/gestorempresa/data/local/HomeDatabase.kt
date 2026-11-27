@@ -85,7 +85,7 @@ interface HomeDao {
     @Query("DELETE FROM home_obligations WHERE workerKind = 'EMPLEADO' AND workerId = :id") suspend fun deleteEmployeeObligations(id: Long)
     @Transaction suspend fun deleteEmployeeAndHistory(id: Long) {
         deleteEmployeeHours(id); deleteEmployeeMeta(id); deleteEmployeeAssignments(id); deleteEmployeeObligations(id)
-        deleteAttachmentsOf("EMPLEADO", id); deleteEmployee(id)
+        deleteAttachmentsOf("EMPLEADO", id); deleteZoneLocationsOf("EMPLEADO", id); deleteEmployee(id)
     }
 
     @Query("DELETE FROM subcontratados WHERE id = :id") suspend fun deleteSubcontractor(id: Long)
@@ -95,7 +95,7 @@ interface HomeDao {
     @Query("DELETE FROM home_obligations WHERE workerKind = 'SUBCONTRATADO' AND workerId = :id") suspend fun deleteSubcontractorObligations(id: Long)
     @Transaction suspend fun deleteSubcontractorAndHistory(id: Long) {
         deleteSubcontractorHours(id); deleteSubcontractorMeta(id); deleteSubcontractorAssignments(id); deleteSubcontractorObligations(id)
-        deleteAttachmentsOf("SUBCONTRATADO", id); deleteSubcontractor(id)
+        deleteAttachmentsOf("SUBCONTRATADO", id); deleteZoneLocationsOf("SUBCONTRATADO", id); deleteSubcontractor(id)
     }
 
     @Query("DELETE FROM materiales WHERE proveedorId = :id") suspend fun deleteSupplierMaterials(id: Long)
@@ -127,6 +127,8 @@ interface HomeDao {
     @Query("SELECT * FROM home_attachments ORDER BY createdAt DESC, id DESC") fun attachments(): Flow<List<HomeAttachment>>
     @Insert suspend fun addAttachment(value: HomeAttachment): Long
     @Query("DELETE FROM home_attachments WHERE id = :id") suspend fun deleteAttachment(id: Long)
+    @Query("UPDATE home_attachments SET path = :path, mimeType = :mimeType WHERE id = :id")
+    suspend fun updateAttachmentFile(id: Long, path: String, mimeType: String)
     @Query("DELETE FROM home_attachments WHERE ownerKind = :kind AND ownerId = :id") suspend fun deleteAttachmentsOf(kind: String, id: Long)
     @Query("SELECT * FROM consumos_materiales ORDER BY fecha DESC, id DESC") fun materialUses(): Flow<List<ConsumoMaterialEntity>>
     @Insert suspend fun addMaterialUse(value: ConsumoMaterialEntity)
@@ -135,6 +137,22 @@ interface HomeDao {
     @Query("UPDATE subcontratados SET fotoUrl = :path WHERE id = :id") suspend fun setSubcontractorPhoto(id: Long, path: String?)
     @Query("UPDATE unidades_trabajo SET latitud = :latitude, longitud = :longitude WHERE id = :id")
     suspend fun setProjectLocation(id: Long, latitude: Double?, longitude: Double?)
+    @Query("SELECT * FROM home_zone_locations") fun zoneLocations(): Flow<List<HomeZoneLocation>>
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun setZoneLocation(value: HomeZoneLocation)
+    @Query("DELETE FROM home_zone_locations WHERE workerKind = :kind AND workerId = :workerId AND workZone = :zone")
+    suspend fun deleteZoneLocation(kind: String, workerId: Long, zone: String)
+    @Query("DELETE FROM home_zone_locations WHERE workerKind = :kind AND workerId = :workerId")
+    suspend fun deleteZoneLocationsOf(kind: String, workerId: Long)
+    /** Añade (o actualiza) una zona laboral con su ubicación en una sola operación. */
+    @Transaction suspend fun saveWorkZone(meta: HomeWorkerMeta, location: HomeZoneLocation?) {
+        setWorkerMeta(meta)
+        if (location != null) setZoneLocation(location) else deleteZoneLocation(meta.workerKind, meta.workerId, meta.workZone)
+    }
+    @Transaction suspend fun removeWorkZone(kind: String, workerId: Long, zone: String) {
+        deleteWorkerZone(kind, workerId, zone); deleteZoneLocation(kind, workerId, zone)
+    }
+    @Query("UPDATE unidades_trabajo SET direccionUbicacion = :address, latitud = :latitude, longitud = :longitude WHERE id = :id")
+    suspend fun setProjectAddressAndLocation(id: Long, address: String, latitude: Double, longitude: Double)
 }
 
 /** Almacén del módulo 2 por empresa; no modifica las tablas de autenticación.
@@ -144,9 +162,10 @@ interface HomeDao {
 @Database(entities = [EmpleadoEntity::class, UnidadTrabajoEntity::class,
     RegistroHorasEntity::class, HomeMovement::class, SubcontratadoEntity::class, ProveedorEntity::class,
     MaterialEntity::class, HomeWorkerMeta::class, HomeAssignment::class, HomeObligation::class,
-    HomeTask::class, HomeAttachment::class, ConsumoMaterialEntity::class], version = 5, exportSchema = true,
+    HomeTask::class, HomeAttachment::class, ConsumoMaterialEntity::class, HomeZoneLocation::class], version = 6, exportSchema = true,
     // 3 → 4 solo crea las tablas de adjuntos y de consumo de materiales (funciones avanzadas).
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 3, to = 4)])
+    // 5 → 6 crea la tabla de ubicaciones de las zonas laborales.
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 3, to = 4), AutoMigration(from = 5, to = 6)])
 abstract class HomeDatabase : RoomDatabase() {
     abstract fun homeDao(): HomeDao
     companion object {

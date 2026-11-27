@@ -20,7 +20,8 @@ data class HomeWorkspaceState(
     val suppliers: List<ProveedorEntity> = emptyList(), val materials: List<MaterialEntity> = emptyList(),
     val workerMeta: List<HomeWorkerMeta> = emptyList(), val assignments: List<HomeAssignment> = emptyList(),
     val obligations: List<HomeObligation> = emptyList(), val tasks: List<HomeTask> = emptyList(),
-    val attachments: List<HomeAttachment> = emptyList(), val materialUses: List<ConsumoMaterialEntity> = emptyList()
+    val attachments: List<HomeAttachment> = emptyList(), val materialUses: List<ConsumoMaterialEntity> = emptyList(),
+    val zoneLocations: List<HomeZoneLocation> = emptyList()
 ) {
     fun workerName(kind: String, id: Long): String = if (kind == "EMPLEADO")
         employees.firstOrNull { it.id == id }?.let { "${it.nombre} ${it.apellidos}" } ?: "Empleado"
@@ -94,12 +95,12 @@ open class HomeWorkspaceViewModel(val dao: HomeDao) : ViewModel() {
         mutableState.update { it.copy(loading = true, error = null) }
         observation = viewModelScope.launch {
             val core = combine(dao.employees(), dao.projects(), dao.hours(), dao.movements()) { e, p, h, m -> HomeWorkspaceState(e, p, h, m, loading = false) }
-            val catalogs = combine(dao.subcontractors(), dao.suppliers(), dao.materials(), dao.workerMeta()) { s, p, m, z ->
-                HomeWorkspaceState(subcontractors = s, suppliers = p, materials = m, workerMeta = z) }
+            val catalogs = combine(dao.subcontractors(), dao.suppliers(), dao.materials(), dao.workerMeta(), dao.zoneLocations()) { s, p, m, z, g ->
+                HomeWorkspaceState(subcontractors = s, suppliers = p, materials = m, workerMeta = z, zoneLocations = g) }
             val activity = combine(dao.assignments(), dao.obligations(), dao.tasks(), dao.attachments(), dao.materialUses()) { a, o, t, f, u ->
                 HomeWorkspaceState(assignments = a, obligations = o, tasks = t, attachments = f, materialUses = u) }
             combine(core, catalogs, activity) { c, l, a -> c.copy(subcontractors = l.subcontractors, suppliers = l.suppliers,
-                materials = l.materials, workerMeta = l.workerMeta, assignments = a.assignments, obligations = a.obligations, tasks = a.tasks,
+                materials = l.materials, workerMeta = l.workerMeta, zoneLocations = l.zoneLocations, assignments = a.assignments, obligations = a.obligations, tasks = a.tasks,
                 attachments = a.attachments, materialUses = a.materialUses) }
                 .catch { emit(HomeWorkspaceState(loading = false, error = "No se han podido cargar los datos. Pulsa Reintentar.")) }
                 .collect { mutableState.value = it }

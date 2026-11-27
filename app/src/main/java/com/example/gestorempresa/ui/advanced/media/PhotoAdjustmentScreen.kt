@@ -30,9 +30,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.min
 
-/** Ajuste compartido para las fotografías: mover, ampliar, reducir y confirmar. */
+/**
+ * Ajuste compartido para las fotografías: mover, ampliar, reducir y confirmar.
+ * Nada se guarda hasta pulsar Confirmar. [circleGuide] muestra el círculo de las fotos de personas;
+ * las imágenes de servicios, proyectos y materiales usan solo el recuadro.
+ */
 @Composable
-fun PhotoAdjustmentScreen(path: String, onConfirm: (File) -> Unit, onCancel: () -> Unit) {
+fun PhotoAdjustmentScreen(path: String, onConfirm: (File) -> Unit, onCancel: () -> Unit,
+    title: String = "Ajustar fotografía", circleGuide: Boolean = true) {
     val context = LocalContext.current
     val store = remember(context) { PhotoAdjustmentStore(context) }
     val bitmap by produceState<android.graphics.Bitmap?>(null, path) {
@@ -52,8 +57,9 @@ fun PhotoAdjustmentScreen(path: String, onConfirm: (File) -> Unit, onCancel: () 
     Dialog(onDismissRequest = { if (!saving) onCancel() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize(), color = Color.Black, contentColor = Color.White) {
             Column(Modifier.fillMaxSize().safeDrawingPadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Ajustar fotografía", style = MaterialTheme.typography.titleLarge)
-                Text("Arrastra la imagen y pellizca para ampliar o reducir. Encuadra el rostro dentro del círculo.")
+                Text(title, style = MaterialTheme.typography.titleLarge)
+                Text(if (circleGuide) "Arrastra la imagen y pellizca para ampliar o reducir. Encuadra el rostro dentro del círculo."
+                    else "Arrastra la imagen y pellizca para ampliar o reducir. Se guardará lo que quede dentro del recuadro.")
                 BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     val image = bitmap
                     if (image == null) Text("No se puede mostrar la imagen. Si no aparece, cancela y prueba otra foto.")
@@ -79,7 +85,7 @@ fun PhotoAdjustmentScreen(path: String, onConfirm: (File) -> Unit, onCancel: () 
                                 scale(scale, scale, pivot = Offset.Zero)
                             }) { drawImage(picture) }
                             drawRect(Color.White.copy(alpha = .8f), style = Stroke(2.dp.toPx()))
-                            drawCircle(Color.White.copy(alpha = .8f), radius = size.width / 2, style = Stroke(2.dp.toPx()))
+                            if (circleGuide) drawCircle(Color.White.copy(alpha = .8f), radius = size.width / 2, style = Stroke(2.dp.toPx()))
                         }
                     }
                 }
@@ -111,10 +117,14 @@ fun PhotoAdjustmentScreen(path: String, onConfirm: (File) -> Unit, onCancel: () 
 }
 
 @Composable
-fun PhotoSourceDialog(onCamera: () -> Unit, onGallery: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("Fotografía de perfil") },
+fun PhotoSourceDialog(onCamera: () -> Unit, onGallery: () -> Unit, onDismiss: () -> Unit,
+    title: String = "Fotografía de perfil", cameraAvailable: Boolean = true, onRemove: (() -> Unit)? = null) {
+    AlertDialog(onDismissRequest = onDismiss, title = { Text(title) },
         text = { Column(Modifier.fillMaxWidth()) {
-            TextButton(onClick = onCamera, modifier = Modifier.fillMaxWidth().testTag("photo-source-camera")) { Text("Cámara") }
+            TextButton(onClick = onCamera, enabled = cameraAvailable, modifier = Modifier.fillMaxWidth().testTag("photo-source-camera")) {
+                Text(if (cameraAvailable) "Cámara" else "Cámara (no disponible en este dispositivo)")
+            }
             TextButton(onClick = onGallery, modifier = Modifier.fillMaxWidth().testTag("photo-source-gallery")) { Text("Galería") }
+            onRemove?.let { TextButton(onClick = it, modifier = Modifier.fillMaxWidth().testTag("photo-source-remove")) { Text("Quitar foto") } }
         } }, confirmButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } })
 }

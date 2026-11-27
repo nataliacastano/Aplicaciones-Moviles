@@ -13,9 +13,13 @@ import com.example.gestorempresa.data.local.entities.ConsumoMaterialEntity
 import com.example.gestorempresa.data.media.AttachmentStorage
 import com.example.gestorempresa.ui.advanced.communication.ContactCard
 import com.example.gestorempresa.ui.advanced.communication.ContactInfo
+import com.example.gestorempresa.ui.advanced.communication.MessageTemplateStore
 import com.example.gestorempresa.ui.advanced.documents.DocumentsCard
+import com.example.gestorempresa.ui.advanced.forms.DateField
+import com.example.gestorempresa.ui.advanced.forms.dateError
 import com.example.gestorempresa.ui.advanced.documents.writeProjectReport
 import com.example.gestorempresa.ui.advanced.map.ProjectMapCard
+import com.example.gestorempresa.ui.advanced.map.WorkZonesCard
 import com.example.gestorempresa.ui.advanced.media.PhotosCard
 import com.example.gestorempresa.ui.advanced.media.WorkerPhotoHeader
 import com.example.gestorempresa.ui.home.*
@@ -48,19 +52,20 @@ fun HomeWorkspaceState.filesOwnedBy(selection: CatalogSelection): List<String> {
 
 /** Parte superior de la ficha: foto (cámara/galería) y botones de comunicación (WhatsApp/Email/llamar). */
 @Composable
-fun AdvancedDetailHeader(selection: CatalogSelection, state: HomeWorkspaceState, workspace: HomeWorkspaceViewModel, storage: AttachmentStorage) {
+fun AdvancedDetailHeader(selection: CatalogSelection, state: HomeWorkspaceState, workspace: HomeWorkspaceViewModel, storage: AttachmentStorage,
+    templates: MessageTemplateStore) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         when (selection.kind) {
             CatalogKind.EMPLOYEES -> state.employees.firstOrNull { it.id == selection.id }?.let { e ->
                 WorkerPhotoHeader("EMPLEADO", e.id, e.fotoUrl, "${e.nombre.take(1)}${e.apellidos.take(1)}".uppercase(), storage, workspace)
-                ContactCard(ContactInfo("EMPLEADO", e.id, "${e.nombre} ${e.apellidos}", e.telefono, e.email), state)
+                ContactCard(ContactInfo("EMPLEADO", e.id, "${e.nombre} ${e.apellidos}", e.telefono, e.email), state, templates)
             }
             CatalogKind.SUBCONTRACTORS -> state.subcontractors.firstOrNull { it.id == selection.id }?.let { s ->
                 WorkerPhotoHeader("SUBCONTRATADO", s.id, s.fotoUrl, s.nombreComercial.take(2).uppercase(), storage, workspace)
-                ContactCard(ContactInfo("SUBCONTRATADO", s.id, s.personaContacto.ifBlank { s.nombreComercial }, s.telefono, s.email), state)
+                ContactCard(ContactInfo("SUBCONTRATADO", s.id, s.personaContacto.ifBlank { s.nombreComercial }, s.telefono, s.email), state, templates)
             }
             CatalogKind.SUPPLIERS -> state.suppliers.firstOrNull { it.id == selection.id }?.let { p ->
-                ContactCard(ContactInfo("PROVEEDOR", p.id, p.personaContacto.ifBlank { p.nombreEmpresa }, p.telefono, p.email), state)
+                ContactCard(ContactInfo("PROVEEDOR", p.id, p.personaContacto.ifBlank { p.nombreEmpresa }, p.telefono, p.email), state, templates)
             }
             else -> Unit
         }
@@ -79,9 +84,11 @@ fun AdvancedDetailFooter(selection: CatalogSelection, state: HomeWorkspaceState,
             state.projects.firstOrNull { it.id == selection.id }?.let { project ->
                 ProjectMapCard(project, onOpenMap) { onPickLocation(project.id) }
                 MaterialUsageCard(project.id, state, workspace)
-                PhotosCard(owner, project.id, state.attachments, storage, workspace, onOpenAttachment, "📷 Fotos de la obra y trabajos realizados")
+                PhotosCard(owner, project.id, state.attachments, storage, workspace, onOpenAttachment, "📷 Fotos del servicio y trabajos realizados")
             }
         }
+        if (selection.kind == CatalogKind.EMPLOYEES || selection.kind == CatalogKind.SUBCONTRACTORS)
+            WorkZonesCard(owner, selection.id, state, workspace)
         if (selection.kind == CatalogKind.MATERIALS) PhotosCard(owner, selection.id, state.attachments, storage, workspace, onOpenAttachment)
         DocumentsCard(owner, selection.id, state, storage, workspace, onOpenAttachment, extraActions = {
             if (selection.kind == CatalogKind.PROJECTS) {
@@ -143,7 +150,7 @@ private fun MaterialUsageCard(projectId: Long, state: HomeWorkspaceState, worksp
                     SelectionField("Material", materialId, state.materials.map { it.id to "${it.nombreMaterial} (${"%.2f".format(it.precioUnitario)} €/${it.unidadMedida})" }, !saving) { materialId = it }
                     OutlinedTextField(quantity, { quantity = it.filter { c -> c.isDigit() || c == ',' || c == '.' } },
                         label = { Text("Cantidad${selected?.let { " (${it.unidadMedida})" }.orEmpty()}") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(date, { date = it }, label = { Text("Fecha (AAAA-MM-DD)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    DateField("Fecha de uso", date, { date = it }, required = true, enabled = !saving, showErrors = error != null)
                     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 }
             },
@@ -153,7 +160,7 @@ private fun MaterialUsageCard(projectId: Long, state: HomeWorkspaceState, worksp
                     when {
                         selected == null -> error = "Elige un material."
                         amount == null || amount <= 0 || !amount.isFinite() -> error = "Indica una cantidad mayor que 0."
-                        !validDate(date) -> error = "La fecha debe tener el formato AAAA-MM-DD."
+                        dateError(date, required = true) != null -> error = dateError(date, required = true)
                         else -> workspace.save({
                             addMaterialUse(ConsumoMaterialEntity(unidadTrabajoId = projectId, materialId = selected.id, cantidad = amount,
                                 precioUnitarioAplicado = selected.precioUnitario, fecha = date))

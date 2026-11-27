@@ -38,7 +38,7 @@ fun homeMenuOptions(avisos: Int = 0, avisosUrgentes: Boolean = false): List<Opci
     OpcionMenu("assignments", "Zonas laborales", Icons.Outlined.LocationOn),
     OpcionMenu("messaging", "Mensajería", Icons.Outlined.Email),
     // Funciones avanzadas
-    OpcionMenu("map", "Mapa de obras", Icons.Outlined.Place, separadorAntes = true),
+    OpcionMenu("map", "Mapa", Icons.Outlined.Place, separadorAntes = true),
     OpcionMenu("stats", "Estadísticas", BarChartIcon),
     OpcionMenu("calendar", "Calendario", Icons.Outlined.DateRange)
 )

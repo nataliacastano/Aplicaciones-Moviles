@@ -51,3 +51,17 @@ data class HomeAttachment(
     val createdAt: String,
     val expiresAt: String? = null
 )
+
+/**
+ * Ubicación en el mapa de una zona laboral (complementa a [HomeWorkerMeta], que guarda su nombre).
+ * Un trabajador puede tener varias zonas, independientes de su dirección personal.
+ */
+@Entity(tableName = "home_zone_locations", primaryKeys = ["workerKind", "workerId", "workZone"])
+data class HomeZoneLocation(
+    val workerKind: String,
+    val workerId: Long,
+    val workZone: String,
+    val address: String,
+    val latitude: Double,
+    val longitude: Double
+)

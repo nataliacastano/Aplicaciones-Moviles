@@ -30,7 +30,7 @@ import org.robolectric.annotation.Config
 class ProfileRepositoryTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).allowMainThreadQueries().build()
-    private val perfiles = RoomProfileRepository(db, FotoPerfilStorage(context))
+    private val perfiles = RoomProfileRepository(db, FotoPerfilStorage(context), CuentasEnMemoria())
     private val ajustes = RoomSettingsRepository(db)
 
     @After fun cerrar() = db.close()
@@ -112,9 +112,18 @@ class ProfileRepositoryTest {
         // Room comprueba al abrir que las tablas creadas por la migración coinciden con las entidades.
         val migrada = Room.databaseBuilder(context, AppDatabase::class.java, nombre).addMigrations(MIGRATION_4_5).allowMainThreadQueries().build()
         try {
-            val perfil = RoomProfileRepository(migrada, FotoPerfilStorage(context)).observarPerfil(5).first()!!
+            val perfil = RoomProfileRepository(migrada, FotoPerfilStorage(context), CuentasEnMemoria()).observarPerfil(5).first()!!
             assertEquals("Ana García", perfil.nombreCompleto)
             assertEquals("Empresa conservada", perfil.empresa.nombre)
         } finally { migrada.close() }
     }
+}
+
+/** Sustituto en memoria del perfil compartido en Firestore: los tests no usan la red. */
+private class CuentasEnMemoria : com.example.gestorempresa.domain.auth.PerfilCuentaService {
+    private val perfiles = mutableMapOf<String, com.example.gestorempresa.domain.auth.PerfilCuentaRemoto>()
+    override suspend fun obtener(uid: String) = perfiles[uid]
+    override suspend fun crearSiFalta(perfil: com.example.gestorempresa.domain.auth.PerfilCuentaRemoto) =
+        perfiles.getOrPut(perfil.uid) { perfil }
+    override suspend fun actualizar(perfil: com.example.gestorempresa.domain.auth.PerfilCuentaRemoto) { perfiles[perfil.uid] = perfil }
 }

@@ -40,14 +40,21 @@ fun StatsScreen(state: HomeWorkspaceState, modifier: Modifier = Modifier) {
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatTile("Horas este mes", "%.1f h".format(current.hours), Modifier.weight(1f))
-                StatTile("Coste de personal", euros(current.personnel), Modifier.weight(1f))
+                StatTile("Ingresos del mes", euros(current.income), Modifier.weight(1f), ChartColors.green)
+                StatTile("Gastos del mes", euros(current.expenses), Modifier.weight(1f), ChartColors.red)
             }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatTile("Coste de materiales", euros(current.materials), Modifier.weight(1f))
-                StatTile("Balance del mes", euros(current.income - current.expenses - current.personnel - current.materials), Modifier.weight(1f))
+                StatTile("Resultado del mes", signedEuros(current.result), Modifier.weight(1f),
+                    if (current.result >= 0) ChartColors.green else ChartColors.red)
+                StatTile("Horas este mes", "%.1f h".format(current.hours), Modifier.weight(1f))
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatTile("Coste de personal (horas)", euros(current.personnel), Modifier.weight(1f), ChartColors.blue)
+                StatTile("Coste de materiales usados", euros(current.materials), Modifier.weight(1f), ChartColors.orange)
             }
         }
         item {
@@ -58,6 +65,12 @@ fun StatsScreen(state: HomeWorkspaceState, modifier: Modifier = Modifier) {
                     LineChart(labels, listOf(ChartSeries("Ingresos", ChartColors.green, monthly.map { it.income }),
                         ChartSeries("Gastos", ChartColors.red, monthly.map { it.expenses })), ::euros, description = "Evolución de ingresos y gastos")
                 }
+            }
+        }
+        item {
+            ChartCard("Resultado mensual", "Ingresos − gastos registrados de cada mes. Verde: positivo; rojo: negativo.") {
+                if (monthly.all { it.income == 0.0 && it.expenses == 0.0 }) EmptyChart("Sin ingresos ni gastos en este periodo.")
+                else ResultBars(labels, monthly.map { it.result }, ::signedEuros, description = "Resultado mensual")
             }
         }
         item {
@@ -79,7 +92,7 @@ fun StatsScreen(state: HomeWorkspaceState, modifier: Modifier = Modifier) {
             }
         }
         item {
-            ChartCard("Comparación de costes entre proyectos", "Coste total acumulado de cada servicio o proyecto.") {
+            ChartCard("Comparación de costes entre proyectos", "Coste estimado acumulado: horas, materiales usados y otros gastos.") {
                 if (projects.isEmpty()) EmptyChart("Ningún servicio tiene costes todavía.")
                 else {
                     ChartLegend(listOf("Personal" to ChartColors.blue, "Materiales" to ChartColors.orange, "Otros gastos" to ChartColors.red))
@@ -101,6 +114,15 @@ fun StatsScreen(state: HomeWorkspaceState, modifier: Modifier = Modifier) {
             }
         }
         item {
+            ChartCard("Cómo se calcula", "Para que ingresos y gastos no se mezclen ni se cuenten dos veces.") {
+                Text("• Resultado = ingresos − gastos registrados. Es el mismo cálculo que el balance de Inicio.\n" +
+                    "• Coste de personal = horas de los partes × tarifa. Coste de materiales = materiales usados × precio de ese día. " +
+                    "Son estimaciones y no se restan otra vez del resultado.\n" +
+                    "• Si un resultado sale negativo sin motivo, revisa que los cobros estén registrados como «Ingreso» y no como «Gasto».",
+                    style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        item {
             ChartCard("Horas por trabajador", "Total de horas registradas por cada persona.") {
                 if (workers.isEmpty()) EmptyChart("Todavía no hay horas registradas.")
                 else HorizontalBars(workers, ChartColors.purple, { "%.1f h".format(it) })
@@ -110,11 +132,11 @@ fun StatsScreen(state: HomeWorkspaceState, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun StatTile(label: String, value: String, modifier: Modifier = Modifier) {
+private fun StatTile(label: String, value: String, modifier: Modifier = Modifier, valueColor: androidx.compose.ui.graphics.Color? = null) {
     Card(modifier, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(value, style = MaterialTheme.typography.titleLarge)
+            Text(value, style = MaterialTheme.typography.titleLarge, color = valueColor ?: MaterialTheme.colorScheme.onSurface)
         }
     }
 }

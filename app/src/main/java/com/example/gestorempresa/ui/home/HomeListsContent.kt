@@ -35,7 +35,7 @@ import kotlinx.coroutines.launch
 /** El miembro 3 recibe tipo e id mediante onOpenDetails, sin duplicar sus pantallas. */
 @Composable
 fun HomeListsContent(session: SesionUsuario, modifier: Modifier = Modifier,
-    onOpenDetails: ((CatalogSelection) -> Unit)? = null, warnDays: Int = 15, resetHomeSignal: Int = 0, onNotifyNow: () -> Unit = {},
+    onOpenDetails: ((CatalogSelection) -> Unit)? = null, warnDays: Int = 15, resetHomeSignal: Int = 0, onNotifyNow: () -> Unit = {}, notifyExpiries: Boolean = true, notifyTasks: Boolean = true,
     perfil: PerfilAdministrador? = null, menuUsuario: List<OpcionMenu> = emptyList(), onUserNavigation: ((String) -> Unit)? = null) {
     val context = LocalContext.current.applicationContext
     val companyId = session.empresa.id
@@ -46,6 +46,9 @@ fun HomeListsContent(session: SesionUsuario, modifier: Modifier = Modifier,
     val dao = remember(companyId) { HomeDatabase.forCompany(context, companyId).homeDao() }
     // Fotos y documentos de la empresa (funciones avanzadas).
     val storage = remember(companyId) { AttachmentStorage(context, companyId) }
+    LaunchedEffect(Unit) { AttachmentStorage.cleanTemporaryFiles(context) }
+    // Plantillas de mensajes guardadas por la empresa.
+    val templates = com.example.gestorempresa.ui.advanced.communication.rememberTemplateStore(companyId)
     val factory = remember(dao) {
         object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -180,7 +183,7 @@ fun HomeListsContent(session: SesionUsuario, modifier: Modifier = Modifier,
                                 onBack = { goBack() },
                                 onOpenRelated = { selectedDetail = it },
                                 listState = detailListState,
-                                header = { AdvancedDetailHeader(selectedDetail!!, state, workspace, storage) },
+                                header = { AdvancedDetailHeader(selectedDetail!!, state, workspace, storage, templates) },
                                 footer = {
                                     AdvancedDetailFooter(selectedDetail!!, state, workspace, storage, session.empresa.nombre,
                                         onOpenAttachment = { viewingAttachmentId = it.id },
@@ -214,12 +217,12 @@ fun HomeListsContent(session: SesionUsuario, modifier: Modifier = Modifier,
                                     }
                                 }
                             )
-                            destination == "messaging" -> MessagingScreen(state) { navigate("home") }
+                            destination == "messaging" -> MessagingScreen(state, templates) { navigate("home") }
                             destination == "map" -> ProjectsMapScreen(state,
                                 onOpenProject = { selectedDetail = CatalogSelection(CatalogKind.PROJECTS, it) },
                                 onPickLocation = { pickingLocationId = it })
                             destination == "stats" -> StatsScreen(state)
-                            destination == "calendar" -> CalendarScreen(state, warnDays, onOpen = { selectedDetail = it }, onNotifyNow = onNotifyNow)
+                            destination == "calendar" -> CalendarScreen(state, warnDays, onOpen = { selectedDetail = it }, onNotifyNow = onNotifyNow, templates = templates, includeExpiries = notifyExpiries, includeTasks = notifyTasks)
                             kind != null -> CatalogScreen(kind, state, workspace, { navigate("home") }, ::navigate,
                                 onSelect = { selection -> if (onOpenDetails != null) onOpenDetails(selection) else selectedDetail = selection },
                                 onEditEmployee = { employeeId -> editingEmployeeId = employeeId; editingFromDetailId = null; navigate("employee-edit") })

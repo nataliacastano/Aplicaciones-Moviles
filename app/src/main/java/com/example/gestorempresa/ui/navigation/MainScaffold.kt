@@ -144,7 +144,7 @@ fun MainScaffold(
         Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
             estadoSecciones.SaveableStateProvider(seccion.name) {
                 when (seccion) {
-                    SeccionPrincipal.INICIO -> HomeListsContent(session = sesion, warnDays = preferencias.diasAntelacion, resetHomeSignal = homeResetSignal,
+                    SeccionPrincipal.INICIO -> HomeListsContent(session = sesion, warnDays = preferencias.diasAntelacion, notifyExpiries = preferencias.avisosVencimientos, notifyTasks = preferencias.avisosTareas, resetHomeSignal = homeResetSignal,
                         perfil = perfil,
                         menuUsuario = listOf(
                             OpcionMenu("user:profile", "Perfil", Icons.Filled.Person, separadorAntes = true),

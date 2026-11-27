@@ -87,10 +87,12 @@ class DetailViewModel(selection: CatalogSelection, state: HomeWorkspaceState) : 
                 CatalogSelection(CatalogKind.SUPPLIERS, it.id)) }.ifEmpty { listOf(DetailField("Proveedores", "Sin materiales registrados")) }),
             DetailSection("Costes", listOf(DetailField("Personal", "${"%.2f".format(costs.personnel)} €"),
                 DetailField("Materiales", "${"%.2f".format(costs.materials)} €"),
-                DetailField("Otros gastos", "${"%.2f".format(costs.otherExpenses)} €"),
-                DetailField("Coste total", "${"%.2f".format(costs.total)} €"),
+                DetailField("Otros gastos (sin personal ni materiales)", "${"%.2f".format(costs.otherExpenses)} €"),
+                DetailField("Coste estimado", "${"%.2f".format(costs.total)} €"),
                 DetailField("Ingresos", "${"%.2f".format(costs.income)} €"),
-                DetailField("Resultado (ingresos − coste total)", "${"%.2f".format(costs.result)} €"),
+                DetailField("Gastos registrados", "${"%.2f".format(costs.registeredExpenses)} €"),
+                DetailField("Resultado (ingresos − gastos registrados)", "${"%+.2f".format(costs.result)} €"),
+                DetailField("Margen estimado (ingresos − coste estimado)", "${"%+.2f".format(costs.estimatedMargin)} €"),
                 DetailField("Saldo de movimientos", "${"%.2f".format(movements.sumOf { if (it.income) it.amountCents else -it.amountCents } / 100.0)} €")))
         ))
     }

@@ -44,6 +44,9 @@ object ChartColors {
 
 data class ChartSeries(val name: String, val color: Color, val values: List<Double>)
 
+/** Importe con signo (+/−) para resultados, que pueden ser negativos. */
+fun signedEuros(value: Double): String = (if (value > 0) "+" else if (value < 0) "−" else "") + euros(kotlin.math.abs(value))
+
 fun euros(value: Double): String = if (kotlin.math.abs(value) >= 10_000) "%.1fk €".format(value / 1000) else "%.0f €".format(value)
 
 /** Leyenda con un punto de color por serie. */
@@ -214,6 +217,41 @@ fun DonutChart(slices: List<Pair<String, Int>>, description: String = "Gráfico 
                     Spacer(Modifier.width(6.dp))
                     Text("$name · $count", style = MaterialTheme.typography.bodyMedium)
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Barras de resultado alrededor del cero: hacia arriba y en verde si es positivo, hacia abajo y en
+ * rojo si es negativo. Así un mes con pérdidas se distingue de un vistazo.
+ */
+@Composable
+fun ResultBars(labels: List<String>, values: List<Double>, format: (Double) -> String, modifier: Modifier = Modifier,
+    description: String = "Resultado") {
+    val measurer = rememberTextMeasurer()
+    val axis = MaterialTheme.colorScheme.outline
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val maxAbs = max(values.maxOfOrNull { kotlin.math.abs(it) } ?: 0.0, 1.0)
+    Canvas(modifier.fillMaxWidth().height(200.dp).semantics { contentDescription = description }) {
+        val top = 16.dp.toPx()
+        val bottom = size.height - 22.dp.toPx()
+        val zero = (top + bottom) / 2
+        val half = zero - top
+        val slot = size.width / labels.size.coerceAtLeast(1)
+        drawLine(axis, Offset(0f, zero), Offset(size.width, zero), 1.dp.toPx())
+        values.forEachIndexed { i, v ->
+            val h = (kotlin.math.abs(v) / maxAbs * half).toFloat()
+            val x = slot * i + slot * 0.2f
+            val w = slot * 0.6f
+            if (h > 0f) drawRoundRect(if (v >= 0) ChartColors.green else ChartColors.red,
+                Offset(x, if (v >= 0) zero - h else zero), Size(w, h), CornerRadius(3.dp.toPx()))
+            val label = measurer.measure(labels[i], TextStyle(fontSize = 10.sp, color = labelColor))
+            drawText(label, topLeft = Offset(slot * i + (slot - label.size.width) / 2, bottom + 5.dp.toPx()))
+            if (v != 0.0) {
+                val text = measurer.measure(format(v), TextStyle(fontSize = 9.sp, color = labelColor))
+                val y = if (v >= 0) zero - h - text.size.height - 2f else zero + h + 2f
+                drawText(text, topLeft = Offset(slot * i + (slot - text.size.width) / 2, y.coerceIn(0f, size.height - text.size.height)))
             }
         }
     }

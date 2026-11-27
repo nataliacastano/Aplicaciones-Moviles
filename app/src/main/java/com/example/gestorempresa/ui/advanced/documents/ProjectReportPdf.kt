@@ -58,15 +58,18 @@ fun writeProjectReport(state: HomeWorkspaceState, projectId: Long, companyName: 
     writer.heading("Resumen económico")
     writer.line("Coste de personal", money(costs.personnel))
     writer.line("Coste de materiales", money(costs.materials))
-    writer.line("Otros gastos", money(costs.otherExpenses))
-    writer.line("Coste total", money(costs.total), bold = true)
+    writer.line("Otros gastos (sin personal ni materiales)", money(costs.otherExpenses))
+    writer.line("Coste estimado", money(costs.total), bold = true)
     writer.line("Ingresos", money(costs.income))
-    writer.line("Resultado", money(costs.income - costs.total), bold = true)
+    writer.line("Gastos registrados", money(costs.registeredExpenses))
+    writer.line("Resultado (ingresos − gastos registrados)", signedMoney(costs.result), bold = true)
+    writer.line("Margen estimado (ingresos − coste estimado)", signedMoney(costs.estimatedMargin))
 
     writer.finish(output)
 }
 
 private fun money(value: Double) = "%.2f €".format(value)
+private fun signedMoney(value: Double) = "%+.2f €".format(value)
 
 /** Pequeño ayudante para escribir texto en páginas A4 y pasar de página automáticamente. */
 private class PdfWriter {
